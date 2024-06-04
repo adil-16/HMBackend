@@ -37,6 +37,7 @@ class App {
         useNewUrlParser: true,
         useUnifiedTopology: true,
         useCreateIndex: true,
+        useFindAndModify: false,
       },
       (err, db) => {
         if (err) {

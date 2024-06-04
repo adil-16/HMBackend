@@ -145,57 +145,57 @@ const userController = {
   // edit user
   async editUser(req, res) {
     try {
+      const fileBuffer = req.file ? req.file.filename : null;
       const id = req.params.id;
       let data = req.body;
-     
+
       if (!id) {
-        return res
-          .status(400)
-          .send({ success: false, data: { error: "User doesn't exist" } });
-      } else {
-        let userExist = await User.findOne({ email: data.email });
-        if (userExist && userExist._id != id) {
-          return res.status(400).send({
-            success: false,
-            data: {
-              error:
-                "You cannot use this email user with this email already exists",
-            },
-          });
-        } else {
-          const salt = await bcrypt.genSalt(10);
-          data.password = await bcrypt.hash(data.password, salt);
-          console.log(data)
-    
-          let user = await User.findOneAndUpdate({ _id: id }, data)
-            .then((result) => {
-              // Changed parameter name from res to result
-              return res.status(200).send({
-                success: true,
-                data: {
-                  message: "user updated successfully",
-                  // authToken: token,
-                  name: result.name,
-                  email: data.email,
-                  _id: id,
-                  image: result.image, },
-              });
-            })
-            .catch((err) => {
-              return res
-                .status(400)
-                .send({ success: false, data: { error: err.message } });
-            });
-        }
+        return res.status(400).send({ success: false, data: { error: "User doesn't exist" } });
       }
+
+      let userExist = await User.findById(id);
+      if (!userExist) {
+        return res.status(400).send({ success: false, data: { error: "User doesn't exist" } });
+      }
+
+      let emailExist = await User.findOne({ email: data.email });
+      if (emailExist && emailExist._id.toString() !== id) {
+        return res.status(400).send({ success: false, data: { error: "You cannot use this email; user with this email already exists" } });
+      }
+
+      if (data.password) {
+        const salt = await bcrypt.genSalt(10);
+        data.password = await bcrypt.hash(data.password, salt);
+      } else {
+        delete data.password;
+      }
+
+      if (fileBuffer) {
+        data.image = fileBuffer;
+      }
+
+      
+
+      const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "User updated successfully",
+          name: updatedUser.name,
+          email: updatedUser.email,
+          _id: id,
+          image: updatedUser.image,
+        },
+      });
     } catch (error) {
-      // Handle any unexpected errors
-      res.status(500).send({
+      console.error("Error in editUser:", error);
+      return res.status(500).send({
         success: false,
         data: { error: "Server Error" },
       });
     }
   },
+  
 
    // search user
    async searchUser(req, res) {

@@ -7,11 +7,11 @@ const userRouter = express.Router();
 
 userRouter.post(
   "/addUser",
-  uploadMiddleware.single("file"),
+  uploadMiddleware.single("image"),
   userController.register
 );
 userRouter.post("/login", userController.login);
-userRouter.put("/updateUser/:id", userController.editUser);
+userRouter.put("/updateUser/:id",uploadMiddleware.single("image"), userController.editUser);
 userRouter.put(
   "/editPhoto/:id",
   uploadMiddleware.single("file"),
