@@ -18,7 +18,7 @@ userRouter.put(
   userController.editPhoto
 );
 userRouter.get("/getUsers", userController.getUsers);
-
+userRouter.get("/getSuppliers", userController.getSuppliers);
 userRouter.get("/search/:value", userController.searchUser);
 userRouter.delete("/deleteUser/:id", userController.deleteUser);
 

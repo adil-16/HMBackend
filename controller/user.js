@@ -1,5 +1,4 @@
 const User = require("../models/user");
-
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -9,95 +8,98 @@ const userController = {
       const fileBuffer = req.file ? req.file.filename : null;
       let userData = req.body;
       let user = new User(userData);
-      user.image = fileBuffer
-      const emailExists = await User.findOne({
-        email: user.email,
-      });
+      user.image = fileBuffer;
+
+      const emailExists = await User.findOne({ email: user.email });
       if (emailExists) {
-        res.status(400).send({
+        return res.status(400).send({
           success: false,
           data: { error: "This user already exists" },
         });
-      } else {
-        if (req.body.password) {
-          const salt = await bcrypt.genSalt(10);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-
-        user.save((error, registereduser) => {
-          if (error) {
-            res.status(400).send({
-              success: false,
-              data: { error: error.message },
-            });
-          } else {
-            const token = jwt.sign(
-              { _id: registereduser._id },
-              process.env.TOKEN_SECRET
-            );
-            res.status(200).send({
-              success: true,
-              data: {
-                message: "user added successfully",
-                authToken: token,
-                name: registereduser.name,
-                email: registereduser.email,
-                _id: registereduser._id,
-              },
-            });
-          }
-        });
       }
-    } catch (err) {
-      console.log(err);
-      return res.status(500).send({
-        success: false,
-        data: { error: "Some Error Occurred" },
-      });
-    }
-  },
-  // ...................... login .............................
-  async login(req, res) {
-    try {
-      const userData = req.body;
-      const user = new User(userData);
-      const founduser = await User.findOne({
-        email: userData.email,
-        isGuest: false,
-        admin: true
-      });
 
-      if (!founduser) {
-        res
-          .status(400)
-          .send({ success: false, data: { error: "user donot exists" } });
-      } else {
-        const validPass = await bcrypt.compare(
-          user.password,
-          founduser.password
-        );
-        if (!validPass) {
-          res
-            .status(400)
-            .send({ success: false, data: { error: "Wrong password" } });
-        } else {
-          const token = jwt.sign(
-            { _id: founduser._id },
-            process.env.TOKEN_SECRET
-          );
-          res.status(200).send({
-            success: true,
+      if (req.body.password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+
+      if (user.role === "customer" && user.customerType === "guest") {
+        if (!userData.passportNumber || !userData.passengers) {
+          return res.status(400).send({
+            success: false,
             data: {
-              message: "logged in successfully",
-              authToken: token,
-              name: founduser.name,
-              email: founduser.email,
-              _id: founduser._id,
-              image: founduser.image,
+              error:
+                "Passport number and passengers are required for guest customers",
             },
           });
         }
+        user.passportNumber = userData.passportNumber;
+        user.passengers = userData.passengers;
       }
+
+      await user.save();
+      const token = jwt.sign(
+        { _id: user._id, role: user.role },
+        process.env.TOKEN_SECRET
+      );
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "User added successfully",
+          authToken: token,
+          name: user.name,
+          email: user.email,
+          _id: user._id,
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Some Error Occurred" },
+      });
+    }
+  },
+
+  async login(req, res) {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return res
+          .status(400)
+          .send({ success: false, data: { error: "User does not exist" } });
+      }
+
+      if (!user.admin && user.customerType === "guest") {
+        return res
+          .status(403)
+          .send({ success: false, data: { error: "Access denied" } });
+      }
+
+      const validPass = await bcrypt.compare(password, user.password);
+      if (!validPass) {
+        return res
+          .status(400)
+          .send({ success: false, data: { error: "Wrong password" } });
+      }
+
+      const token = jwt.sign(
+        { _id: user._id, role: user.admin ? "admin" : "b2b" },
+        process.env.TOKEN_SECRET
+      );
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Logged in successfully",
+          authToken: token,
+          name: user.name,
+          email: user.email,
+          _id: user._id,
+          image: user.image,
+        },
+      });
     } catch (err) {
       return res.status(500).send({
         success: false,
@@ -106,35 +108,34 @@ const userController = {
     }
   },
 
-  //........................ edit profile photo .....................
   async editPhoto(req, res) {
     try {
-      const id = req.params.id
+      const id = req.params.id;
       const fileBuffer = req.file ? req.file.filename : null;
-      
-     
-      let user = await User.findOneAndUpdate({ _id: id }, {image: fileBuffer})
-      .then((result) => {
-        // Changed parameter name from res to result
+
+      let user = await User.findOneAndUpdate(
+        { _id: id },
+        { image: fileBuffer },
+        { new: true }
+      );
+      if (user) {
         return res.status(200).send({
           success: true,
           data: {
-            message: "image updated successfully",
-            // authToken: token,
-            name: result.name,
-            email: result.email,
+            message: "Image updated successfully",
+            name: user.name,
+            email: user.email,
             _id: id,
             image: fileBuffer,
           },
         });
-      })
-      .catch((err) => {
+      } else {
         return res
           .status(400)
-          .send({ success: false, data: { error: err.message } });
-      });
+          .send({ success: false, data: { error: "User not found" } });
+      }
     } catch (err) {
-      console.log(err);
+      console.error(err);
       return res.status(500).send({
         success: false,
         data: { error: "Some Error Occurred" },
@@ -142,25 +143,27 @@ const userController = {
     }
   },
 
-  // edit user
   async editUser(req, res) {
     try {
       const fileBuffer = req.file ? req.file.filename : null;
       const id = req.params.id;
       let data = req.body;
 
-      if (!id) {
-        return res.status(400).send({ success: false, data: { error: "User doesn't exist" } });
-      }
-
       let userExist = await User.findById(id);
       if (!userExist) {
-        return res.status(400).send({ success: false, data: { error: "User doesn't exist" } });
+        return res
+          .status(400)
+          .send({ success: false, data: { error: "User doesn't exist" } });
       }
 
       let emailExist = await User.findOne({ email: data.email });
       if (emailExist && emailExist._id.toString() !== id) {
-        return res.status(400).send({ success: false, data: { error: "You cannot use this email; user with this email already exists" } });
+        return res
+          .status(400)
+          .send({
+            success: false,
+            data: { error: "Email already in use by another user" },
+          });
       }
 
       if (data.password) {
@@ -173,8 +176,6 @@ const userController = {
       if (fileBuffer) {
         data.image = fileBuffer;
       }
-
-      
 
       const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
       return res.status(200).send({
@@ -195,116 +196,115 @@ const userController = {
       });
     }
   },
-  
 
-   // search user
-   async searchUser(req, res) {
+  async searchUser(req, res) {
     try {
       const value = req.params.value;
 
-          let user = await User.find({ 
-            $or: [
-              { name: new RegExp(value, 'i') },
-              { email: new RegExp(value, 'i') },
-              { phone: new RegExp(value, 'i') },
-            ],
-           })
-            .then((result) => {
-              let users = [];
-              result.map((val, ind) => {
-                role = "";
-                if (val.isGuest == true) {
-                  role = "Guest";
-                } else {
-                  role = "Customer";
-                }
-    
-    
-                let userr = {
-                  id: val._id,
-                  name: val.name,
-                  email: val.email,
-                  phone: val.phone,
-                  role,
-                  image: val.image,
-                  isSelected: false,
-                };
-                users.push(userr);
-              });
-              users.reverse()
-              return res.status(200).send({
-                success: true,
-                data: { message: "details updated successfully", user: users },
-              });
-            })
-            .catch((err) => {
-              return res
-                .status(400)
-                .send({ success: false, data: { error: err.message } });
-            });
-     
+      let users = await User.find({
+        $or: [
+          { name: new RegExp(value, "i") },
+          { email: new RegExp(value, "i") },
+          { phone: new RegExp(value, "i") },
+        ],
+      });
+
+      let userList = users.map((user) => ({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        customerType: user.customerType || "",
+        image: user.image,
+        isSelected: false,
+      }));
+
+      return res.status(200).send({
+        success: true,
+        data: { message: "Details updated successfully", user: userList },
+      });
     } catch (error) {
-      // Handle any unexpected errors
-      res.status(500).send({
+      console.error("Error in searchUser:", error);
+      return res.status(500).send({
         success: false,
         data: { error: "Server Error" },
       });
     }
   },
 
-  // get all users
   async getUsers(req, res) {
     try {
-      let user = await User.find({admin: false})
-        .then((result) => {
-          let users = [];
-          result.map((val, ind) => {
-            role = "";
-            if (val.isGuest == true) {
-              role = "Guest";
-            } else {
-              role = "Customer";
-            }
+      let users = await User.find({ role: { $ne: "admin" } });
 
+      let userList = users.map((user) => {
+        let userData = {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          customerType: user.customerType || "",
+          image: user.image,
+          isSelected: false,
+        };
 
-            let userr = {
-              id: val._id,
-              name: val.name,
-              email: val.email,
-              phone: val.phone,
-              role,
-              image: val.image,
-              isSelected: false,
-            };
-            users.push(userr);
-          });
-          users.reverse()
-          return res.status(200).send({
-            success: true,
-            data: { message: "details found successfully", user: users },
-          });
-        })
-        .catch((err) => {
-          return res
-            .status(400)
-            .send({ success: false, data: { error: err.message } });
-        });
+        if (user.role === "customer" && user.customerType === "guest") {
+          userData.passportNumber = user.passportNumber || "";
+          userData.passengers = user.passengers || [];
+        }
+
+        return userData;
+      });
+
+      return res.status(200).send({
+        success: true,
+        data: { message: "Details found successfully", user: userList },
+      });
     } catch (error) {
-      // Handle any unexpected errors
-      res.status(500).send({
+      console.error("Error in getUsers:", error);
+      return res.status(500).send({
         success: false,
         data: { error: "Server Error" },
       });
     }
   },
 
-  // delete user
+  async getSuppliers(req, res) {
+    try {
+      const suppliers = await User.find({ role: "supplier" });
+
+      let supplierList = suppliers.map((supplier) => ({
+        id: supplier._id,
+        name: supplier.name,
+        email: supplier.email,
+        phone: supplier.phone,
+        role: supplier.role,
+        image: supplier.image,
+        isSelected: false,
+      }));
+
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Suppliers found successfully",
+          suppliers: supplierList,
+        },
+      });
+    } catch (error) {
+      console.error("Error in getSuppliers:", error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+
   async deleteUser(req, res) {
     const _id = req.params.id;
     try {
       let user = await User.findOneAndDelete({ _id });
       if (user) {
-        // Changed parameter name from res to result
         return res.status(200).send({
           success: true,
           data: { message: "User deleted successfully" },
@@ -315,8 +315,8 @@ const userController = {
           .send({ success: false, data: { error: "User not found" } });
       }
     } catch (error) {
-      // Handle any unexpected errors
-      res.status(500).send({
+      console.error("Error in deleteUser:", error);
+      return res.status(500).send({
         success: false,
         data: { error: "Server Error" },
       });
@@ -325,6 +325,3 @@ const userController = {
 };
 
 module.exports = userController;
-
-// router.post("/login", async (req, res) => {
-// });

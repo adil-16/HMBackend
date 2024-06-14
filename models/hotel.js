@@ -7,6 +7,11 @@ const bedSchema = new Schema({
     type: Number,
     required: true,
   },
+  // bedType: {
+  //   type: String,
+  //   required:true
+  // },
+
   isBooked: { type: Boolean, default: false },
   Booking: {
     from: {

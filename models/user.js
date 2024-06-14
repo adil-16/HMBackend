@@ -6,9 +6,23 @@ const userSchema = new Schema({
     type: String,
     required: true,
   },
-  admin: {
-    type: Boolean,
-    default: false,
+  role: {
+    type: String,
+    enum: ['admin', 'customer', 'supplier'],
+    required: true,
+  },
+  customerType: {
+    type: String,
+    enum: ['guest', 'b2b'],
+    required: function() { return this.role === 'customer'; },
+  },
+  passportNumber: {
+    type: String,
+    required: function() { return this.role === 'customer' && this.customerType === 'guest'; },
+  },
+  passengers: {
+    type: [String],
+    required: function() { return this.role === 'customer' && this.customerType === 'guest'; },
   },
   image: {
     type: String,
@@ -22,11 +36,8 @@ const userSchema = new Schema({
     required: true,
   },
   password: {
-    type: String
-  },
-  isGuest: {
-    type: Boolean,
-    required: true,
+    type: String,
   },
 });
+
 module.exports = mongoose.model("user", userSchema, "users");

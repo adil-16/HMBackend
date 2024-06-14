@@ -5,9 +5,10 @@ const dashController = {
   async getHotels(req, res) {
     try {
       const roomTypeCount = await Hotel.aggregate([
-        { $unwind: "$rooms" },  // Deconstructs the rooms array
+        { $unwind: "$rooms" }, 
+        { $unwind: "$rooms.beds" }, 
         { $group: { 
-            _id: "$rooms.roomType", 
+          _id: "$rooms.beds.bedType",
             count: { $sum: 1 }
           } 
         },
@@ -20,9 +21,10 @@ const dashController = {
       ]);
   
       const roomBooked = await Hotel.aggregate([
-        { $unwind: "$rooms" },  // Deconstructs the rooms array
+        { $unwind: "$rooms" }, 
+        { $unwind: "$rooms.beds" }, // Deconstructs the rooms array
         { $group: { 
-            _id: { isBooked: { $ifNull: ["$rooms.isBooked", false] } }, 
+            _id: { isBooked: { $ifNull: ["$rooms.beds.isBooked", false] } }, 
             count: { $sum: 1 }
           } 
         },
@@ -34,39 +36,26 @@ const dashController = {
         }
       ]);
   
+  
       const customersCount = await User.aggregate([
         {
-          $group: {
-            _id: "$isGuest",
-            count: { $sum: 1 },
-          },
+          $match: { role: { $ne: 'admin' } }
         },
-      ]);
-  
-      const roomsCount = await Hotel.aggregate([
         {
-          $facet: {
-            totalRooms: [
-              { $unwind: "$rooms" },
-              { $group: { _id: null, totalRooms: { $sum: 1 } } },
-              { $project: { _id: 0, totalRooms: 1 } }
-            ],
-            numberOfHotels: [
-              { $group: { _id: null, numberOfHotels: { $sum: 1 } } },
-              { $project: { _id: 0, numberOfHotels: 1 } }
-            ]
+          $group: {
+            _id: "$role",
+            count: { $sum: 1 }
           }
         }
       ]);
-  
-      // Extract the counts
-      let guestCount = 0;
+
+      let supplierCount = 0;
       let registeredCount = 0;
-  
+
       customersCount.forEach((group) => {
-        if (group._id) {
-          guestCount = group.count;
-        } else {
+        if (group._id === 'supplier') {
+          supplierCount = group.count;
+        } else if (group._id === 'customer') {
           registeredCount = group.count;
         }
       });
@@ -84,10 +73,10 @@ const dashController = {
       });
   
       let cards = [
-        { name: "Guests", number: guestCount },
+        { name: "Suppliers", number: supplierCount },
         { name: "Customers", number: registeredCount },
-        { name: "Rooms", number: roomsCount[0].totalRooms[0]?.totalRooms || 0 },
-        { name: "Hotels", number: roomsCount[0].numberOfHotels[0]?.numberOfHotels || 0 },
+        // { name: "Rooms", number: roomsCount[0].totalRooms[0]?.totalRooms || 0 },
+        // { name: "Hotels", number: roomsCount[0].numberOfHotels[0]?.numberOfHotels || 0 },
       ];
   
       const booking = [
