@@ -99,6 +99,21 @@ const ledgerController = {
       console.error(error);
       res.status(500).json({ message: 'An error occurred while fetching the ledgers...' });
     }
+},
+   getAdminLedger:async(req,res)=>{
+    try {
+        const { role } = req.query;
+    
+        if (!role) {
+          return res.status(400).json({ message: 'Missing required role parameter.' });
+        }
+        const ledgers = await Ledger.find({ role });
+    
+        res.status(200).json({ message: 'Admin ledgers fetched successfully.', ledgers });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'An error occurred while fetching the ledgers.' });
+      }
 }
 };
 
