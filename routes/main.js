@@ -2,7 +2,7 @@ const express = require("express");
 const userRouter = require("./user");
 const hotelRouter = require("./hotel");
 const dashRouter = require("./dashboard");
-const packageRouter = require('./package');
+const ledgerRouter=require("./ledger")
 const poformRouter= require('./poform');
 const authGuard = require("../middleware/authGuard.middleware");
 
@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
 router.use("/user", userRouter);
 router.use("/hotel", hotelRouter);
 router.use("/dashboard", dashRouter);
-router.use("/package", packageRouter);
+router.use("/ledger", ledgerRouter);
 router.use("/poform", poformRouter);
 
 module.exports = router;
