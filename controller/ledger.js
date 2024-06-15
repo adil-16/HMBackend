@@ -7,41 +7,41 @@ const ledgerController = {
       if (!title || !credit || !role || !supId || !balance) {
         throw new Error("Please Enter All Required Fields!");
       }
-      if(role=="cash"){
-        try {
-            let ledger=await Ledger.findOne({role:"cash"})
-            const newEntry={
-                title,
-                debit:credit,
-                credit:0,
-                balance,
-              }
-              if (ledger) {
-                ledger.entries.push(newEntry);
-                let totalBalance=ledger.entries.reduce((acc,entr)=>{
-                      return acc + entr.balance
-                },0)
-                ledger.totalBalance=totalBalance
-              } else {
-                  ledger = new Ledger({
-                  hotelId,
-                  role,
-                  entries: [newEntry],
-                  totalBalance
-                });
-              }
-              await ledger.save();
+    //   if(role=="cash"){
+    //     try {
+    //         let ledger=await Ledger.findOne({role:"cash"})
+    //         const newEntry={
+    //             title,
+    //             debit:credit,
+    //             credit:0,
+    //             balance,
+    //           }
+    //           if (ledger) {
+    //             ledger.entries.push(newEntry);
+    //             let totalBalance=ledger.entries.reduce((acc,entr)=>{
+    //                   return acc + entr.balance
+    //             },0)
+    //             ledger.totalBalance=totalBalance
+    //           } else {
+    //               ledger = new Ledger({
+    //               hotelId,
+    //               role,
+    //               entries: [newEntry],
+    //               totalBalance
+    //             });
+    //           }
+    //           await ledger.save();
         
-              res.status(201).json({ message: "Ledger updated successfully!", ledger });
+    //           res.status(201).json({ message: "Ledger updated successfully!", ledger });
 
     
-        } catch (error) {
-            console.error(error);
-         res.status(500).json({ message: error.message });
+    //     } catch (error) {
+    //         console.error(error);
+    //      res.status(500).json({ message: error.message });
 
-        }
+    //     }
           
-      }
+    //   }
 
       let ledger = await Ledger.findOne({ supId });
       const newEntry = {
