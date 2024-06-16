@@ -33,8 +33,9 @@ const userController = {
             },
           });
         }
+        const parsedPassengers = JSON.parse(userData.passengers);
         user.passportNumber = userData.passportNumber;
-        user.passengers = userData.passengers;
+        user.passengers = parsedPassengers;
       }
 
       await user.save();
@@ -145,57 +146,71 @@ const userController = {
 
   async editUser(req, res) {
     try {
-      const fileBuffer = req.file ? req.file.filename : null;
-      const id = req.params.id;
-      let data = req.body;
+        const fileBuffer = req.file ? req.file.filename : null;
+        const id = req.params.id;
+        let data = req.body;
 
-      let userExist = await User.findById(id);
-      if (!userExist) {
-        return res
-          .status(400)
-          .send({ success: false, data: { error: "User doesn't exist" } });
-      }
+        let userExist = await User.findById(id);
+        if (!userExist) {
+            return res
+                .status(400)
+                .send({ success: false, data: { error: "User doesn't exist" } });
+        }
 
-      let emailExist = await User.findOne({ email: data.email });
-      if (emailExist && emailExist._id.toString() !== id) {
-        return res
-          .status(400)
-          .send({
-            success: false,
-            data: { error: "Email already in use by another user" },
-          });
-      }
+        let emailExist = await User.findOne({ email: data.email });
+        if (emailExist && emailExist._id.toString() !== id) {
+            return res
+                .status(400)
+                .send({
+                    success: false,
+                    data: { error: "Email already in use by another user" },
+                });
+        }
 
-      if (data.password) {
-        const salt = await bcrypt.genSalt(10);
-        data.password = await bcrypt.hash(data.password, salt);
-      } else {
-        delete data.password;
-      }
+        if (data.password) {
+            const salt = await bcrypt.genSalt(10);
+            data.password = await bcrypt.hash(data.password, salt);
+        } else {
+            delete data.password;
+        }
 
-      if (fileBuffer) {
-        data.image = fileBuffer;
-      }
+        if (fileBuffer) {
+            data.image = fileBuffer;
+        }
 
-      const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
-      return res.status(200).send({
-        success: true,
-        data: {
-          message: "User updated successfully",
-          name: updatedUser.name,
-          email: updatedUser.email,
-          _id: id,
-          image: updatedUser.image,
-        },
-      });
+        // Parse passengers array correctly
+        if (data.passengers) {
+            try {
+                data.passengers = JSON.parse(data.passengers);
+            } catch (error) {
+                console.error("Error parsing passengers:", error);
+                return res.status(400).send({
+                    success: false,
+                    data: { error: "Invalid passengers format" },
+                });
+            }
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
+        return res.status(200).send({
+            success: true,
+            data: {
+                message: "User updated successfully",
+                name: updatedUser.name,
+                email: updatedUser.email,
+                _id: id,
+                image: updatedUser.image,
+            },
+        });
     } catch (error) {
-      console.error("Error in editUser:", error);
-      return res.status(500).send({
-        success: false,
-        data: { error: "Server Error" },
-      });
+        console.error("Error in editUser:", error);
+        return res.status(500).send({
+            success: false,
+            data: { error: "Server Error" },
+        });
     }
-  },
+},
+
 
   async searchUser(req, res) {
     try {
