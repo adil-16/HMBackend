@@ -175,7 +175,10 @@ async getSingleHotel(req, res) {
           .send({ success: false, data: { error: "Hotel ID is required" } });
       } else {
         const updatedData = req.body;
-        const hotel = await Hotel.findOneAndUpdate({ _id: id }, updatedData, {
+        const hotelRooms=await Hotel.findOne({_id:id})
+        let updatedRoomArray=[...hotelRooms.rooms,...updatedData.rooms]
+        let updatedObject={...updatedData,rooms:updatedRoomArray}
+        const hotel = await Hotel.findOneAndUpdate({ _id: id }, updatedObject, {
           new: true,
         });
 
