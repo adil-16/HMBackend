@@ -5,7 +5,6 @@ const Ledger=require("../models/ledger")
 const poformController = {
   async createPoform(req, res) {
     const { supplierID, hotelID, checkin, checkout, rooms, bedRates,debit,credit,role } = req.body;
-    console.log(checkin,checkout)
     try {
       
 
@@ -18,15 +17,14 @@ const poformController = {
       const checkinDate = new Date(checkin);
       const checkoutDate = new Date(checkout);
       const nights = Math.ceil((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
-
       // Room bed count mapping
-      const roomBedCount = {
-        shared: 5,
-        quad: 4,
-        triple: 3,
-        double: 2,
-      };
-
+      const bedCounts = { shared: 5, quad: 4, triple: 3, double: 2 };
+      const roomBedCount = Object.entries(rooms).reduce((acc, [key, value]) => {
+        if (value && value !== '0') {
+          acc[key] = bedCounts[key];
+        }
+        return acc;
+      }, {});
       // Calculate total payable for each room type
       let totalPayable = 0;
       let roomPayables = {};

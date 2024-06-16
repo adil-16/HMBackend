@@ -43,19 +43,19 @@ const poformSchema = new Schema({
   bedRates: {
     shared: {
       type: Number,
-      required: true,
+      // required: true,
     },
     quad: {
       type: Number,
-      required: true,
+      // required: true,
     },
     triple: {
       type: Number,
-      required: true,
+      // required: true,
     },
     double: {
       type: Number,
-      required: true,
+      // required: true,
     },
   },
 });
