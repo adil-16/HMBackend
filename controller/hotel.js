@@ -177,7 +177,7 @@ async getSingleHotel(req, res) {
         const updatedData = req.body;
         const hotelRooms=await Hotel.findOne({_id:id})
         let updatedRoomArray=[...hotelRooms.rooms,...updatedData.rooms]
-        let updatedObject={...updatedData,rooms:updatedRoomArray}
+        let updatedObject={...updatedData,totalRooms:updatedRoomArray.length,rooms:updatedRoomArray}
         const hotel = await Hotel.findOneAndUpdate({ _id: id }, updatedObject, {
           new: true,
         });
