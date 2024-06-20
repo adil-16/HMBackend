@@ -9,7 +9,7 @@ const poformController = {
       
 
       // Validate input
-      if (!supplierID || !hotelID || !checkin || !checkout || !rooms || !bedRates) {
+      if (!supplierID || !hotelID || !checkin || !checkout|| !rooms  || !bedRates) {
         return res.status(400).send({ success: false, data: { error: "Invalid input" } });
       }
 
@@ -37,6 +37,8 @@ const poformController = {
         totalPayable += roomPayable;
         roomPayables[roomType] = roomPayable;
       }
+   
+    
 
       // Create new Poform document
       const newPoform = new Poform({

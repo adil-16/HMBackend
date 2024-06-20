@@ -8,7 +8,8 @@ const hotelRouter = express.Router();
 hotelRouter.post("/addHotel",
 uploadMiddleware.single("file"),
  hotelController.addHotel);
-hotelRouter.put("/updateHotel/:id", hotelController.editHotel);
+hotelRouter.put("/editHotel/:id", hotelController.editHotel);
+hotelRouter.put("/updateHotel/:id", hotelController.updateHotel);
 hotelRouter.put("/bookBed/:id", hotelController.bookBed);
 hotelRouter.get("/getBookedBeds/:id", hotelController.getHotelBookings);
 hotelRouter.get("/getAllBooking", hotelController.getAllBookings);
