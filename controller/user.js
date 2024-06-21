@@ -28,11 +28,11 @@ const userController = {
           return res.status(400).send({
             success: false,
             data: {
-              error: "Passport number and passengers are required for guest customers",
+              error:
+                "Passport number and passengers are required for guest customers",
             },
           });
         }
-        // No need to parse passengers if it's already an array
         user.passportNumber = userData.passportNumber;
         user.passengers = userData.passengers;
       }
@@ -50,6 +50,7 @@ const userController = {
           name: user.name,
           email: user.email,
           _id: user._id,
+          gender: user.gender,
         },
       });
     } catch (err) {
@@ -145,19 +146,18 @@ const userController = {
 
       let userExist = await User.findById(id);
       if (!userExist) {
-        return res
-          .status(400)
-          .send({ success: false, data: { error: "User doesn't exist" } });
+        return res.status(400).send({
+          success: false,
+          data: { error: "User doesn't exist" },
+        });
       }
 
       let emailExist = await User.findOne({ email: data.email });
       if (emailExist && emailExist._id.toString() !== id) {
-        return res
-          .status(400)
-          .send({
-            success: false,
-            data: { error: "Email already in use by another user" },
-          });
+        return res.status(400).send({
+          success: false,
+          data: { error: "Email already in use by another user" },
+        });
       }
 
       if (data.password) {
@@ -172,7 +172,7 @@ const userController = {
       }
 
       // Parse passengers array correctly if it's a string
-      if (typeof data.passengers === 'string') {
+      if (typeof data.passengers === "string") {
         try {
           data.passengers = JSON.parse(data.passengers);
         } catch (error) {
@@ -193,6 +193,7 @@ const userController = {
           email: updatedUser.email,
           _id: id,
           image: updatedUser.image,
+          gender: updatedUser.gender,
         },
       });
     } catch (error) {
@@ -320,8 +321,12 @@ const userController = {
         customerType: customer.customerType || "",
         image: customer.image,
         isSelected: false,
-        passportNumber: customer.customerType === "guest" ? customer.passportNumber : undefined,
-        passengers: customer.customerType === "guest" ? customer.passengers : undefined,
+        passportNumber:
+          customer.customerType === "guest"
+            ? customer.passportNumber
+            : undefined,
+        passengers:
+          customer.customerType === "guest" ? customer.passengers : undefined,
       }));
 
       return res.status(200).send({

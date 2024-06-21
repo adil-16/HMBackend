@@ -5,20 +5,29 @@ const Voucher = require("../models/voucher");
 const voucherController = {
   async createVoucher(req, res) {
     try {
-      const { hotel, customer, accommodations } = req.body;
+      const { customer, accommodations } = req.body;
 
-      const hotelRecord = await Hotel.findById(hotel);
-      if (!hotelRecord) {
-        return res.status(404).send({ success: false, data: { error: "Hotel not found" } });
-      }
-
+      // Validate customer
       const customerRecord = await User.findById(customer);
       if (!customerRecord) {
         return res.status(404).send({ success: false, data: { error: "Customer not found" } });
       }
 
+      // Validate accommodations and their hotels
+      for (let accommodation of accommodations) {
+        const hotelRecord = await Hotel.findById(accommodation.hotel);
+        if (!hotelRecord) {
+          return res.status(404).send({ success: false, data: { error: `Hotel with id ${accommodation.hotel} not found` } });
+        }
+        if (!accommodation.bedRate) {
+          return res.status(400).send({ success: false, data: { error: "Bed rate is required" } });
+        }
+        if (accommodation.roomType === "Shared" && !accommodation.noOfBeds) {
+          return res.status(400).send({ success: false, data: { error: "Number of beds is required for shared rooms" } });
+        }
+      }
+
       const voucher = new Voucher({
-        hotel,
         customer,
         accommodations,
       });
@@ -30,7 +39,6 @@ const voucherController = {
         data: {
           message: "Voucher created successfully",
           voucher: savedVoucher,
-          hotel: hotelRecord,
           customer: customerRecord,
         },
       });
@@ -43,7 +51,13 @@ const voucherController = {
   async getVoucher(req, res) {
     try {
       const voucherId = req.params.id;
-      const voucher = await Voucher.findById(voucherId).populate("hotel").populate("customer");
+      const voucher = await Voucher.findById(voucherId)
+        .populate("customer")
+        .populate({
+          path: "accommodations.hotel",
+          model: "hotel"
+        });
+
       if (!voucher) {
         return res.status(404).send({ success: false, data: { error: "Voucher not found" } });
       }

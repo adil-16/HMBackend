@@ -97,13 +97,10 @@ async addHotel(req, res) {
 
     const fileBuffer = req.file ? req.file.filename : null;
     let hotelData = req.body;
-   
 
     if (fileBuffer != null) {
       hotelData.image = fileBuffer;
     }
-
-    // Check if the hotel already exists
     const hotelExists = await Hotel.findOne({
       name: hotelData.name,
       location: hotelData.location,
@@ -119,35 +116,25 @@ async addHotel(req, res) {
         hotelData.rooms = JSON.parse(hotelData.rooms);
       }
 
-      // Initialize room type counters
-      let roomTypeCount = {
-        Shared: 0,
-        Quad: 0,
-        Triple: 0,
-        Double: 0,
-      };
-
-      // Process rooms to assign roomNumber and bedNumber
+      let roomNumberCounter = 0;   
       let processedRooms = hotelData.rooms.map(room => {
-        let roomType = room.roomType;
-        let roomNumber = ++roomTypeCount[roomType]; // Increment room number for this type
+        roomNumberCounter++; 
 
         // Create beds array based on the number of beds
         let beds = Array.from({ length: room.totalBeds }, (_, index) => ({
           bedNumber: index + 1,
-          isBooked: false, // Assuming default value for new beds
-          bedRate: room.beds && room.beds[index] ? room.beds[index].bedRate : 0, // Default rate or provided rate
+          isBooked: room.beds && room.beds[index] ? room.beds[index].isBooked : false,
+          bedRate: room.beds && room.beds[index] ? room.beds[index].bedRate : 0, 
         }));
 
-        // Return the processed room object
         return {
           ...room,
-          roomNumber: roomNumber.toString(),
+          roomNumber: roomNumberCounter.toString(),
           beds: beds,
         };
       });
 
-      // Create a new Hotel instance
+    
       let hotel = new Hotel({
         name: hotelData.name,
         image: hotelData.image,
@@ -183,66 +170,68 @@ async addHotel(req, res) {
   }
 }
 
+
 ,
   // edit hotel
 
   async editHotel(req, res) {
     try {
       const id = req.params.id;
-
+  
       if (!id) {
         return res
           .status(400)
           .send({ success: false, data: { error: "Hotel ID is required" } });
       } else {
         const updatedData = req.body;
-        const hotelRooms=await Hotel.findOne({_id:id})
-
- let roomTypeCount;
-
-         roomTypeCount = hotelRooms.rooms.reduce((acc, room) => {
-        const roomType = room.roomType;
-        acc[roomType] = (acc[roomType] || 0) + 1;
-        return acc;
-      }, {});
-
-        const rooms= updatedData.roomDetails.reduce((acc, roomDetail) => {
-      
+        const hotel = await Hotel.findOne({ _id: id });
+  
+        if (!hotel) {
+          return res
+            .status(404)
+            .send({ success: false, data: { error: "Hotel not found" } });
+        }
+  
+        
+        let roomNumberCounter = hotel.rooms.length;
+  
+        const newRooms = updatedData.roomDetails.reduce((acc, roomDetail) => {
           const numRooms = parseInt(roomDetail.rooms);
           for (let i = 1; i <= numRooms; i++) {
-            const roomNumber = (roomTypeCount[roomDetail.type] || 0 ) + 1
-            roomTypeCount[roomDetail.type]=(roomTypeCount[roomDetail.type] || 0) + 1
+            roomNumberCounter++; 
+  
             const beds = [];
             for (let j = 1; j <= roomDetail.beds; j++) {
               beds.push({
                 bedNumber: j,
-                bedRate: roomDetail.rate || 0, 
+                bedRate: roomDetail.rate || 0,
               });
             }
             acc.push({
               roomType: roomDetail.type,
-              roomNumber: roomNumber.toString(),
+              roomNumber: roomNumberCounter.toString(),
               totalBeds: roomDetail.beds,
               beds: beds,
             });
           }
           return acc;
         }, []);
-        
-        let updatedRoomArray=[...hotelRooms.rooms,...rooms]
-        let updatedObject={location:updatedData.location,name:updatedData.name,totalRooms:updatedRoomArray.length,rooms:updatedRoomArray}
-        const hotel = await Hotel.findOneAndUpdate({ _id: id }, updatedObject, {
+  
+        const updatedRoomArray = [...hotel.rooms, ...newRooms];
+        const updatedObject = {
+          location: updatedData.location,
+          name: updatedData.name,
+          totalRooms: updatedRoomArray.length,
+          rooms: updatedRoomArray,
+        };
+  
+        const updatedHotel = await Hotel.findOneAndUpdate({ _id: id }, updatedObject, {
           new: true,
         });
-
-        if (!hotel) {
-          return res
-            .status(404)
-            .send({ success: false, data: { error: "Hotel not found" } });
-        }
+  
         return res.status(200).send({
           success: true,
-          data: { message: "Details updated successfully", hotel: hotel },
+          data: { message: "Details updated successfully", hotel: updatedHotel },
         });
       }
     } catch (error) {
@@ -252,7 +241,8 @@ async addHotel(req, res) {
         data: { error: "Server Error" },
       });
     }
-  },
+  }
+  ,
   async updateHotel(req, res) {
     try {
       const id = req.params.id;

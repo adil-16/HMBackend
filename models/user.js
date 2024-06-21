@@ -11,6 +11,15 @@ const passSchema = new Schema({
     type: Number,
     required: true,
   },
+  passportNumber: {
+    type: String,
+    required: true,
+  },
+  gender: {
+    type: String,
+    enum: ["male", "female", "other"],
+    required: true,
+  },
 });
 
 const userSchema = new Schema({
@@ -47,6 +56,11 @@ const userSchema = new Schema({
     required: function () {
       return this.role === "customer" && this.customerType === "guest";
     },
+  },
+  gender: {
+    type: String,
+    enum: ["male", "female", "other"],
+    required: true,
   },
   image: {
     type: String,
