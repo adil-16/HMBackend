@@ -4,7 +4,8 @@ const hotelRouter = require("./hotel");
 const dashRouter = require("./dashboard");
 const ledgerRouter=require("./ledger")
 const poformRouter= require('./poform');
-const paymentVoucherRouter=require("./payment-voucher")
+const paymentVoucherRouter=require("./payment-voucher");
+const hotelVoucher = require("./voucher");
 const authGuard = require("../middleware/authGuard.middleware");
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.use("/dashboard", dashRouter);
 router.use("/ledger", ledgerRouter);
 router.use("/poform", poformRouter);
 router.use("/payment-voucher", paymentVoucherRouter);
+router.use("/hotel-voucher", hotelVoucher);
 
 module.exports = router;
 

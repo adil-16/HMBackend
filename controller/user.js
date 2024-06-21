@@ -28,14 +28,13 @@ const userController = {
           return res.status(400).send({
             success: false,
             data: {
-              error:
-                "Passport number and passengers are required for guest customers",
+              error: "Passport number and passengers are required for guest customers",
             },
           });
         }
-        const parsedPassengers = JSON.parse(userData.passengers);
+        // No need to parse passengers if it's already an array
         user.passportNumber = userData.passportNumber;
-        user.passengers = parsedPassengers;
+        user.passengers = userData.passengers;
       }
 
       await user.save();
@@ -73,12 +72,6 @@ const userController = {
           .send({ success: false, data: { error: "User does not exist" } });
       }
 
-      if (!user.admin && user.customerType === "guest") {
-        return res
-          .status(403)
-          .send({ success: false, data: { error: "Access denied" } });
-      }
-
       const validPass = await bcrypt.compare(password, user.password);
       if (!validPass) {
         return res
@@ -87,7 +80,7 @@ const userController = {
       }
 
       const token = jwt.sign(
-        { _id: user._id, role: user.admin ? "admin" : "b2b" },
+        { _id: user._id, role: user.role },
         process.env.TOKEN_SECRET
       );
       return res.status(200).send({
@@ -146,71 +139,70 @@ const userController = {
 
   async editUser(req, res) {
     try {
-        const fileBuffer = req.file ? req.file.filename : null;
-        const id = req.params.id;
-        let data = req.body;
+      const fileBuffer = req.file ? req.file.filename : null;
+      const id = req.params.id;
+      let data = req.body;
 
-        let userExist = await User.findById(id);
-        if (!userExist) {
-            return res
-                .status(400)
-                .send({ success: false, data: { error: "User doesn't exist" } });
-        }
+      let userExist = await User.findById(id);
+      if (!userExist) {
+        return res
+          .status(400)
+          .send({ success: false, data: { error: "User doesn't exist" } });
+      }
 
-        let emailExist = await User.findOne({ email: data.email });
-        if (emailExist && emailExist._id.toString() !== id) {
-            return res
-                .status(400)
-                .send({
-                    success: false,
-                    data: { error: "Email already in use by another user" },
-                });
-        }
-
-        if (data.password) {
-            const salt = await bcrypt.genSalt(10);
-            data.password = await bcrypt.hash(data.password, salt);
-        } else {
-            delete data.password;
-        }
-
-        if (fileBuffer) {
-            data.image = fileBuffer;
-        }
-
-        // Parse passengers array correctly
-        if (data.passengers) {
-            try {
-                data.passengers = JSON.parse(data.passengers);
-            } catch (error) {
-                console.error("Error parsing passengers:", error);
-                return res.status(400).send({
-                    success: false,
-                    data: { error: "Invalid passengers format" },
-                });
-            }
-        }
-
-        const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
-        return res.status(200).send({
-            success: true,
-            data: {
-                message: "User updated successfully",
-                name: updatedUser.name,
-                email: updatedUser.email,
-                _id: id,
-                image: updatedUser.image,
-            },
-        });
-    } catch (error) {
-        console.error("Error in editUser:", error);
-        return res.status(500).send({
+      let emailExist = await User.findOne({ email: data.email });
+      if (emailExist && emailExist._id.toString() !== id) {
+        return res
+          .status(400)
+          .send({
             success: false,
-            data: { error: "Server Error" },
-        });
-    }
-},
+            data: { error: "Email already in use by another user" },
+          });
+      }
 
+      if (data.password) {
+        const salt = await bcrypt.genSalt(10);
+        data.password = await bcrypt.hash(data.password, salt);
+      } else {
+        delete data.password;
+      }
+
+      if (fileBuffer) {
+        data.image = fileBuffer;
+      }
+
+      // Parse passengers array correctly if it's a string
+      if (typeof data.passengers === 'string') {
+        try {
+          data.passengers = JSON.parse(data.passengers);
+        } catch (error) {
+          console.error("Error parsing passengers:", error);
+          return res.status(400).send({
+            success: false,
+            data: { error: "Invalid passengers format" },
+          });
+        }
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "User updated successfully",
+          name: updatedUser.name,
+          email: updatedUser.email,
+          _id: id,
+          image: updatedUser.image,
+        },
+      });
+    } catch (error) {
+      console.error("Error in editUser:", error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
 
   async searchUser(req, res) {
     try {
@@ -308,6 +300,39 @@ const userController = {
       });
     } catch (error) {
       console.error("Error in getSuppliers:", error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+
+  async getCustomers(req, res) {
+    try {
+      const customers = await User.find({ role: "customer" });
+
+      let customerList = customers.map((customer) => ({
+        id: customer._id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        role: customer.role,
+        customerType: customer.customerType || "",
+        image: customer.image,
+        isSelected: false,
+        passportNumber: customer.customerType === "guest" ? customer.passportNumber : undefined,
+        passengers: customer.customerType === "guest" ? customer.passengers : undefined,
+      }));
+
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Customers found successfully",
+          customers: customerList,
+        },
+      });
+    } catch (error) {
+      console.error("Error in getCustomers:", error);
       return res.status(500).send({
         success: false,
         data: { error: "Server Error" },
