@@ -25,9 +25,14 @@ const ledgerSchema = new mongoose.Schema({
     ref:"user"
    
   },
+  cusId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: function() { return this.role === 'customer'; },
+    ref:"user"
+  },
   hotelId: {
     type: mongoose.Schema.Types.ObjectId,
-    required: true,
+    // required: true,
     ref: 'Hotel'
   },
   role: {

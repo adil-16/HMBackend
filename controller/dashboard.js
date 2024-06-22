@@ -5,10 +5,9 @@ const dashController = {
   async getHotels(req, res) {
     try {
       const roomTypeCount = await Hotel.aggregate([
-        { $unwind: "$rooms" }, 
-        { $unwind: "$rooms.beds" }, 
+        { $unwind: "$rooms" },  // Deconstructs the rooms array
         { $group: { 
-          _id: "$rooms.beds.bedType",
+            _id: "$rooms.roomType", 
             count: { $sum: 1 }
           } 
         },

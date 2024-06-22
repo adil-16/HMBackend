@@ -4,6 +4,7 @@ const ledgerRouter = express.Router();
 
 ledgerRouter.post("/createLedger",ledgerController.createLedger)
 ledgerRouter.get("/filterLedger/:id",ledgerController.filterLedger)
+ledgerRouter.get("/filterAdminLedger",ledgerController.filterAdminLedger)
 ledgerRouter.get("/getAdminLedger",ledgerController.getAdminLedger)
 
 module.exports =  ledgerRouter;

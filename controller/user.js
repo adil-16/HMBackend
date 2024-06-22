@@ -9,7 +9,7 @@ const userController = {
       let userData = req.body;
       let user = new User(userData);
       user.image = fileBuffer;
-
+  
       const emailExists = await User.findOne({ email: user.email });
       if (emailExists) {
         return res.status(400).send({
@@ -17,12 +17,12 @@ const userController = {
           data: { error: "This user already exists" },
         });
       }
-
+  
       if (req.body.password) {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
       }
-
+  
       if (user.role === "customer" && user.customerType === "guest") {
         if (!userData.passportNumber || !userData.passengers) {
           return res.status(400).send({
@@ -34,9 +34,9 @@ const userController = {
           });
         }
         user.passportNumber = userData.passportNumber;
-        user.passengers = userData.passengers;
+        user.passengers = JSON.parse(userData.passengers);
       }
-
+  
       await user.save();
       const token = jwt.sign(
         { _id: user._id, role: user.role },
