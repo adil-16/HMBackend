@@ -44,6 +44,27 @@ const ledgerController = {
     }
   },
 
+  getLedger: async (req, res) => {
+    try {
+      const { supplierId, hotelId } = req.query;
+      console.log(supplierId, hotelId)
+      if (!supplierId || !hotelId) {
+        return res.status(400).json({ message: 'Missing required query parameters.' });
+      }
+
+      const ledger = await Ledger.findOne({ supId: supplierId, hotelId: hotelId });
+      if (ledger) {
+        res.status(200).json({ message: 'Ledger found.', ledger });
+      } else {
+        res.status(404).json({ message: 'Ledger not found.' });
+      }
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'An error occurred while fetching the ledger.' });
+    }
+  },
+
+
   filterLedger: async (req, res) => {
     try {
       const { id } = req.params;
