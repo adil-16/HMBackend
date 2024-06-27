@@ -9,7 +9,7 @@ const userController = {
       let userData = req.body;
       let user = new User(userData);
       user.image = fileBuffer;
-  
+
       const emailExists = await User.findOne({ email: user.email });
       if (emailExists) {
         return res.status(400).send({
@@ -17,26 +17,38 @@ const userController = {
           data: { error: "This user already exists" },
         });
       }
-  
+
       if (req.body.password) {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(user.password, salt);
       }
-  
-      if (user.role === "customer" && user.customerType === "guest") {
-        if (!userData.passportNumber || !userData.passengers) {
-          return res.status(400).send({
-            success: false,
-            data: {
-              error:
-                "Passport number and passengers are required for guest customers",
-            },
-          });
+
+      if (user.role === "customer") {
+        if (user.customerType === "guest") {
+          if (!userData.passportNumber || !userData.passengers) {
+            return res.status(400).send({
+              success: false,
+              data: {
+                error:
+                  "Passport number and passengers are required for guest customers",
+              },
+            });
+          }
+          user.passportNumber = userData.passportNumber;
+        } else if (user.customerType === "b2b") {
+          if (!userData.companyName || !userData.passengers) {
+            return res.status(400).send({
+              success: false,
+              data: {
+                error: "Company name and passengers are required for B2B customers",
+              },
+            });
+          }
+          user.companyName = userData.companyName;
         }
-        user.passportNumber = userData.passportNumber;
         user.passengers = JSON.parse(userData.passengers);
       }
-  
+
       await user.save();
       const token = jwt.sign(
         { _id: user._id, role: user.role },
@@ -257,8 +269,10 @@ const userController = {
           isSelected: false,
         };
 
-        if (user.role === "customer" && user.customerType === "guest") {
-          userData.passportNumber = user.passportNumber || "";
+        if (user.role === "customer") {
+          if (user.customerType === "guest") {
+            userData.passportNumber = user.passportNumber || "";
+          }
           userData.passengers = user.passengers || [];
         }
 
@@ -325,8 +339,11 @@ const userController = {
           customer.customerType === "guest"
             ? customer.passportNumber
             : undefined,
-        passengers:
-          customer.customerType === "guest" ? customer.passengers : undefined,
+        passengers: customer.passengers || [],
+        companyName:
+          customer.customerType === "b2b"
+            ? customer.companyName
+            : undefined,
       }));
 
       return res.status(200).send({

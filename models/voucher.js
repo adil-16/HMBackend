@@ -16,6 +16,26 @@ const accommodationSchema = new mongoose.Schema({
 
 const voucherSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.ObjectId, ref: "user", required: true },
+  confirmationStatus: {
+    type: String,
+    enum: ["Confirmed", "Tentative"],
+    required: true,
+  },
+  tentativeDate: {
+    type: Date,
+    required: function () {
+      return this.confirmationStatus === "Tentative";
+    },
+  },
+  confirmationType: {
+    type: String,
+    enum: ["Individual", "Group"],
+    required: true,
+  },
+  vatnumber: {
+    type: String,
+    required: true,
+  },
   accommodations: [accommodationSchema],
 });
 

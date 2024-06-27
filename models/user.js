@@ -39,6 +39,12 @@ const userSchema = new Schema({
       return this.role === "customer";
     },
   },
+  companyName: {
+    type: String,
+    required: function () {
+      return this.role === "customer" && this.customerType === "b2b";
+    },
+  },
   age: {
     type: Number,
     required: function () {
@@ -54,7 +60,7 @@ const userSchema = new Schema({
   passengers: {
     type: [passSchema],
     required: function () {
-      return this.role === "customer" && this.customerType === "guest";
+      return this.role === "customer";
     },
   },
   gender: {

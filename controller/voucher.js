@@ -6,7 +6,7 @@ const Ledger = require("../models/ledger");
 const voucherController = {
   async createVoucher(req, res) {
     try {
-      const { customer, accommodations } = req.body;
+      const { customer, accommodations, confirmationStatus, tentativeDate, confirmationType, vatnumber } = req.body;
 
       // Validate customer
       const customerRecord = await User.findById(customer);
@@ -36,6 +36,10 @@ const voucherController = {
       // Create voucher
       const voucher = new Voucher({
         customer,
+        confirmationStatus,
+        tentativeDate: confirmationStatus === "Tentative" ? tentativeDate : null,
+        confirmationType,
+        vatnumber,
         accommodations,
       });
 
@@ -49,14 +53,14 @@ const voucherController = {
         title: "Booking",
         debit: totalAmount,
         credit: 0,
-        balance: totalAmount
+        balance: totalAmount,
       };
 
       const cashEntry = {
         title: "Booking",
         debit: 0,
         credit: totalAmount,
-        balance: -totalAmount
+        balance: -totalAmount,
       };
 
       if (customerLedger) {
