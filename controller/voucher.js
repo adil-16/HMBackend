@@ -108,116 +108,125 @@ const voucherController = {
 
   async getFilteredVouchers(req, res) {
     try {
-      const { reportType, fromDate, toDate, hotelId, confirmationStatus, duration } = req.query;
-  
-      // Validate the input
-      if (!reportType || !hotelId || !confirmationStatus) {
-        return res.status(400).send({ success: false, data: { error: "Missing required query parameters" } });
-      }
-  
-      let from, to;
-  
-      // Determine the date range based on the duration
-      const today = new Date();
-      if (duration === "Today") {
-        from = new Date(today.setHours(0, 0, 0, 0));
-        to = new Date(today.setHours(23, 59, 59, 999));
-      } else if (duration === "Tomorrow") {
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        from = new Date(tomorrow.setHours(0, 0, 0, 0));
-        to = new Date(tomorrow.setHours(23, 59, 59, 999));
-      } else if (duration === "Custom") {
-        if (!fromDate || !toDate) {
-          return res.status(400).send({ success: false, data: { error: "Missing required query parameters" } });
+        const { reportType, fromDate, toDate, hotelId, confirmationStatus, duration, customerId } = req.query;
+
+        // Validate the input
+        if (!reportType || !hotelId || !confirmationStatus) {
+            return res.status(400).send({ success: false, data: { error: "Missing required query parameters" } });
         }
-        from = new Date(fromDate);
-        to = new Date(toDate);
-      } else {
-        return res.status(400).send({ success: false, data: { error: "Invalid duration selected" } });
-      }
-  
-      // Determine the filter field based on the reportType
-      let dateFilterField;
-      if (reportType === "Arrival Intimation") {
-        dateFilterField = "accommodations.checkin";
-      } else if (reportType === "Departure Intimation") {
-        dateFilterField = "accommodations.checkout";
-      } else {
-        return res.status(400).send({ success: false, data: { error: "Invalid report type" } });
-      }
-  
-      let confirmationStatusQuery;
-      if (confirmationStatus === "Both") {
-        confirmationStatusQuery = { $in: ["Tentative", "Confirmed"] };
-      } else {
-        confirmationStatusQuery = confirmationStatus;
-      }
-  
-      // Find vouchers matching the criteria
-      const vouchers = await Voucher.find({
-        confirmationStatus: confirmationStatusQuery,
-        "accommodations.hotel": hotelId,
-        [dateFilterField]: { $gte: from, $lte: to }
-      }).populate("customer");
-  
-      if (!vouchers.length) {
-        return res.status(404).send({ success: false, data: { error: "No vouchers found matching the criteria" } });
-      }
-  
-      // Helper function to classify the ages
-      const getPaxType = (age) => {
-        if (age >= 0 && age <= 2) return "infant";
-        if (age >= 3 && age <= 12) return "child";
-        if (age > 12) return "adult";
-        return "unknown"; 
-      };
-  
-      // Iterate through vouchers to classify and count ages
-      vouchers.forEach(voucher => {
-        let adultCount = 0;
-        let childCount = 0;
-        let infantCount = 0;
-  
-        const customerAge = voucher.customer.age;
-        if (customerAge !== undefined) {
-          const customerType = getPaxType(customerAge);
-          if (customerType === "adult") adultCount++;
-          if (customerType === "child") childCount++;
-          if (customerType === "infant") infantCount++;
-        }
-  
-        if (voucher.customer.passengers && Array.isArray(voucher.customer.passengers)) {
-          voucher.customer.passengers.forEach(passenger => {
-            const passengerAge = passenger.age;
-            if (passengerAge !== undefined) {
-              const passengerType = getPaxType(passengerAge);
-              if (passengerType === "adult") adultCount++;
-              if (passengerType === "child") childCount++;
-              if (passengerType === "infant") infantCount++;
+
+        let from, to;
+
+        // Determine the date range based on the duration
+        const today = new Date();
+        if (duration === "Today") {
+            from = new Date(today.setHours(0, 0, 0, 0));
+            to = new Date(today.setHours(23, 59, 59, 999));
+        } else if (duration === "Tomorrow") {
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            from = new Date(tomorrow.setHours(0, 0, 0, 0));
+            to = new Date(tomorrow.setHours(23, 59, 59, 999));
+        } else if (duration === "Custom") {
+            if (!fromDate || !toDate) {
+                return res.status(400).send({ success: false, data: { error: "Missing required query parameters" } });
             }
-          });
+            from = new Date(fromDate);
+            to = new Date(toDate);
+        } else {
+            return res.status(400).send({ success: false, data: { error: "Invalid duration selected" } });
         }
-  
-        voucher.paxCounts = { adultCount, childCount, infantCount };
-      });
-  
-      const paxCounts = vouchers.reduce(
-        (acc, voucher) => {
-          acc.adultCount += voucher.paxCounts.adultCount;
-          acc.childCount += voucher.paxCounts.childCount;
-          acc.infantCount += voucher.paxCounts.infantCount;
-          return acc;
-        },
-        { adultCount: 0, childCount: 0, infantCount: 0 }
-      );
-  
-      return res.status(200).send({ success: true, data: { vouchers, paxCounts } });
+
+        // Determine the filter field based on the reportType
+        let dateFilterField;
+        if (reportType === "Arrival Intimation") {
+            dateFilterField = "accommodations.checkin";
+        } else if (reportType === "Departure Intimation") {
+            dateFilterField = "accommodations.checkout";
+        } else {
+            return res.status(400).send({ success: false, data: { error: "Invalid report type" } });
+        }
+
+        let confirmationStatusQuery;
+        if (confirmationStatus === "Both") {
+            confirmationStatusQuery = { $in: ["Tentative", "Confirmed"] };
+        } else {
+            confirmationStatusQuery = confirmationStatus;
+        }
+
+        // Build the query
+        let query = {
+            confirmationStatus: confirmationStatusQuery,
+            "accommodations.hotel": hotelId,
+            [dateFilterField]: { $gte: from, $lte: to }
+        };
+
+        // Add customer filter if customerId is provided
+        if (customerId) {
+            query["customer"] = customerId;
+        }
+
+        // Find vouchers matching the criteria
+        const vouchers = await Voucher.find(query).populate("customer");
+
+        if (!vouchers.length) {
+            return res.status(404).send({ success: false, data: { error: "No vouchers found matching the criteria" } });
+        }
+
+        // Helper function to classify the ages
+        const getPaxType = (age) => {
+            if (age >= 0 && age <= 2) return "infant";
+            if (age >= 3 && age <= 12) return "child";
+            if (age > 12) return "adult";
+            return "unknown"; 
+        };
+
+        // Iterate through vouchers to classify and count ages
+        vouchers.forEach(voucher => {
+            let adultCount = 0;
+            let childCount = 0;
+            let infantCount = 0;
+
+            const customerAge = voucher.customer.age;
+            if (customerAge !== undefined) {
+                const customerType = getPaxType(customerAge);
+                if (customerType === "adult") adultCount++;
+                if (customerType === "child") childCount++;
+                if (customerType === "infant") infantCount++;
+            }
+
+            if (voucher.customer.passengers && Array.isArray(voucher.customer.passengers)) {
+                voucher.customer.passengers.forEach(passenger => {
+                    const passengerAge = passenger.age;
+                    if (passengerAge !== undefined) {
+                        const passengerType = getPaxType(passengerAge);
+                        if (passengerType === "adult") adultCount++;
+                        if (passengerType === "child") childCount++;
+                        if (passengerType === "infant") infantCount++;
+                    }
+                });
+            }
+
+            voucher.paxCounts = { adultCount, childCount, infantCount };
+        });
+
+        const paxCounts = vouchers.reduce(
+            (acc, voucher) => {
+                acc.adultCount += voucher.paxCounts.adultCount;
+                acc.childCount += voucher.paxCounts.childCount;
+                acc.infantCount += voucher.paxCounts.infantCount;
+                return acc;
+            },
+            { adultCount: 0, childCount: 0, infantCount: 0 }
+        );
+
+        return res.status(200).send({ success: true, data: { vouchers, paxCounts } });
     } catch (error) {
-      console.error(error);
-      return res.status(500).send({ success: false, data: { error: "Server Error" } });
+        console.error(error);
+        return res.status(500).send({ success: false, data: { error: "Server Error" } });
     }
-  },
+}
+,
   
   
 
