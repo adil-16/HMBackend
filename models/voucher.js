@@ -15,6 +15,7 @@ const accommodationSchema = new mongoose.Schema({
 });
 
 const voucherSchema = new mongoose.Schema({
+  voucherNumber: {type: String, required: true},
   customer: { type: mongoose.Schema.ObjectId, ref: "user", required: true },
   confirmationStatus: {
     type: String,
@@ -37,6 +38,7 @@ const voucherSchema = new mongoose.Schema({
     required: true,
   },
   accommodations: [accommodationSchema],
+  
 });
 
 module.exports = mongoose.model("voucher", voucherSchema, "vouchers");
