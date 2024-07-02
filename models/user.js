@@ -2,28 +2,12 @@ const mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 
-const passSchema = new Schema({
-  name: {
-    type: String,
-    required: true,
-  },
-  age: {
-    type: Number,
-    required: true,
-  },
-  passportNumber: {
-    type: String,
-    required: true,
-  },
-  gender: {
-    type: String,
-    enum: ["male", "female", "other"],
-    required: true,
-  },
-});
-
 const userSchema = new Schema({
-  name: {
+  businessName: {
+    type: String,
+    required: true,
+  },
+  contactPerson: {
     type: String,
     required: true,
   },
@@ -38,35 +22,6 @@ const userSchema = new Schema({
     required: function () {
       return this.role === "customer";
     },
-  },
-  companyName: {
-    type: String,
-    required: function () {
-      return this.role === "customer" && this.customerType === "b2b";
-    },
-  },
-  age: {
-    type: Number,
-    required: function () {
-      return this.role === "customer";
-    },
-  },
-  passportNumber: {
-    type: String,
-    required: function () {
-      return this.role === "customer" && this.customerType === "guest";
-    },
-  },
-  passengers: {
-    type: [passSchema],
-    required: function () {
-      return this.role === "customer";
-    },
-  },
-  gender: {
-    type: String,
-    enum: ["male", "female", "other"],
-    required: true,
   },
   image: {
     type: String,

@@ -24,30 +24,18 @@ const userController = {
       }
 
       if (user.role === "customer") {
-        if (user.customerType === "guest") {
-          if (!userData.passportNumber || !userData.passengers) {
+        if (!userData.customerType) {
+         
             return res.status(400).send({
               success: false,
               data: {
                 error:
-                  "Passport number and passengers are required for guest customers",
+                  "Customer Type is required",
               },
             });
+  
           }
-          user.passportNumber = userData.passportNumber;
-        } else if (user.customerType === "b2b") {
-          if (!userData.companyName || !userData.passengers) {
-            return res.status(400).send({
-              success: false,
-              data: {
-                error: "Company name and passengers are required for B2B customers",
-              },
-            });
-          }
-          user.companyName = userData.companyName;
         }
-        user.passengers = JSON.parse(userData.passengers);
-      }
 
       await user.save();
       const token = jwt.sign(
@@ -59,10 +47,10 @@ const userController = {
         data: {
           message: "User added successfully",
           authToken: token,
-          name: user.name,
+          businessName: user.businessName,
+          contactPerson: user.contactPerson,
           email: user.email,
           _id: user._id,
-          gender: user.gender,
         },
       });
     } catch (err) {
@@ -101,7 +89,8 @@ const userController = {
         data: {
           message: "Logged in successfully",
           authToken: token,
-          name: user.name,
+          businessName: user.businessName,
+          contactPerson: user.contactPerson,
           email: user.email,
           _id: user._id,
           image: user.image,
@@ -130,7 +119,8 @@ const userController = {
           success: true,
           data: {
             message: "Image updated successfully",
-            name: user.name,
+            businessName: user.businessName,
+            contactPerson: user.contactPerson,
             email: user.email,
             _id: id,
             image: fileBuffer,
@@ -184,28 +174,17 @@ const userController = {
       }
 
       // Parse passengers array correctly if it's a string
-      if (typeof data.passengers === "string") {
-        try {
-          data.passengers = JSON.parse(data.passengers);
-        } catch (error) {
-          console.error("Error parsing passengers:", error);
-          return res.status(400).send({
-            success: false,
-            data: { error: "Invalid passengers format" },
-          });
-        }
-      }
 
       const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
       return res.status(200).send({
         success: true,
         data: {
           message: "User updated successfully",
-          name: updatedUser.name,
+          businessName: updatedUser.businessName,
+          contactPerson: updatedUser.contactPerson,
           email: updatedUser.email,
           _id: id,
           image: updatedUser.image,
-          gender: updatedUser.gender,
         },
       });
     } catch (error) {
@@ -223,7 +202,7 @@ const userController = {
 
       let users = await User.find({
         $or: [
-          { name: new RegExp(value, "i") },
+          { contactPerson: new RegExp(value, "i") },
           { email: new RegExp(value, "i") },
           { phone: new RegExp(value, "i") },
         ],
@@ -231,7 +210,8 @@ const userController = {
 
       let userList = users.map((user) => ({
         id: user._id,
-        name: user.name,
+        businessName: user.businessName,
+        contactPerson: user.contactPerson,
         email: user.email,
         phone: user.phone,
         role: user.role,
@@ -260,7 +240,8 @@ const userController = {
       let userList = users.map((user) => {
         let userData = {
           id: user._id,
-          name: user.name,
+          businessName: user.businessName,
+          contactPerson: user.contactPerson,
           email: user.email,
           phone: user.phone,
           role: user.role,
@@ -298,7 +279,8 @@ const userController = {
 
       let supplierList = suppliers.map((supplier) => ({
         id: supplier._id,
-        name: supplier.name,
+        businessName: supplier.businessName,
+        contactPerson: supplier.contactPerson,
         email: supplier.email,
         phone: supplier.phone,
         role: supplier.role,
@@ -328,22 +310,14 @@ const userController = {
 
       let customerList = customers.map((customer) => ({
         id: customer._id,
-        name: customer.name,
+        businessName: customer.businessName,
+        contactPerson: customer.contactPerson,
         email: customer.email,
         phone: customer.phone,
         role: customer.role,
         customerType: customer.customerType || "",
         image: customer.image,
         isSelected: false,
-        passportNumber:
-          customer.customerType === "guest"
-            ? customer.passportNumber
-            : undefined,
-        passengers: customer.passengers || [],
-        companyName:
-          customer.customerType === "b2b"
-            ? customer.companyName
-            : undefined,
       }));
 
       return res.status(200).send({
