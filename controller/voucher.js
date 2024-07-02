@@ -14,6 +14,8 @@ const voucherController = {
         tentativeHours,
         vatnumber,
         passengers,
+        bankId, // New addition: Bank ID from request body
+        paymentMethod, // New addition: Payment method (cash or bank)
       } = req.body;
 
       // Validate tentativeHours
@@ -37,7 +39,6 @@ const voucherController = {
       // Validate accommodations and their hotels
       let totalAmount = 0;
       for (let accommodation of accommodations) {
-        console.log("accomd", accommodation.hotel);
         const hotelRecord = await Hotel.findById(accommodation.hotel);
         if (!hotelRecord) {
           return res.status(404).send({
@@ -75,9 +76,7 @@ const voucherController = {
           if (!accommodation.totalRooms) {
             return res.status(400).send({
               success: false,
-              data: {
-                error: "Total rooms is required for non-shared rooms",
-              },
+              data: { error: "Total rooms is required for non-shared rooms" },
             });
           }
           amount = accommodation.roomRate * accommodation.totalRooms * nights;
@@ -100,12 +99,13 @@ const voucherController = {
 
       const savedVoucher = await voucher.save();
 
-      // Update ledger for customer and cash
+      // Update ledger based on payment method
       let customerLedger = await Ledger.findOne({
         cusId: customer,
         role: "customer",
       });
-      let cashLedger = await Ledger.findOne({ role: "cash" });
+      let cashLedger = null;
+      let bankLedger = null;
 
       const customerEntry = {
         title: "Booking",
@@ -114,13 +114,52 @@ const voucherController = {
         balance: totalAmount,
       };
 
-      const cashEntry = {
-        title: "Booking",
-        debit: 0,
-        credit: totalAmount,
-        balance: -totalAmount,
-      };
+      if (paymentMethod === "cash") {
+        cashLedger = await Ledger.findOne({ role: "cash" });
 
+        const cashEntry = {
+          title: "Booking",
+          debit: 0,
+          credit: totalAmount,
+          balance: -totalAmount,
+        };
+
+        if (cashLedger) {
+          cashLedger.entries.push(cashEntry);
+          cashLedger.totalBalance -= totalAmount;
+        } else {
+          cashLedger = new Ledger({
+            hotelId: accommodations[0].hotel,
+            role: "cash",
+            entries: [cashEntry],
+            totalBalance: -totalAmount,
+          });
+        }
+      } else if (paymentMethod === "bank" && bankId) {
+        bankLedger = await Ledger.findOne({ role: "bank", bankId });
+
+        const bankEntry = {
+          title: "Booking",
+          debit: 0,
+          credit: totalAmount,
+          balance: -totalAmount,
+        };
+
+        if (bankLedger) {
+          bankLedger.entries.push(bankEntry);
+          bankLedger.totalBalance -= totalAmount;
+        } else {
+          bankLedger = new Ledger({
+            bankId, // Use provided bankId
+            hotelId: accommodations[0].hotel,
+            role: "bank",
+            entries: [bankEntry],
+            totalBalance: -totalAmount,
+          });
+        }
+      }
+
+      // Save ledgers
       if (customerLedger) {
         customerLedger.entries.push(customerEntry);
         customerLedger.totalBalance += totalAmount;
@@ -134,20 +173,9 @@ const voucherController = {
         });
       }
 
-      if (cashLedger) {
-        cashLedger.entries.push(cashEntry);
-        cashLedger.totalBalance -= totalAmount;
-      } else {
-        cashLedger = new Ledger({
-          hotelId: accommodations[0].hotel,
-          role: "cash",
-          entries: [cashEntry],
-          totalBalance: -totalAmount,
-        });
-      }
-
       await customerLedger.save();
-      await cashLedger.save();
+      if (cashLedger) await cashLedger.save();
+      if (bankLedger) await bankLedger.save();
 
       return res.status(201).send({
         success: true,
@@ -164,6 +192,7 @@ const voucherController = {
         .send({ success: false, data: { error: error.message } });
     }
   },
+
   async getFilteredVouchers(req, res) {
     try {
       const {

@@ -1,16 +1,32 @@
-const Ledger = require('../models/ledger');
+const Ledger = require("../models/ledger");
 
 const ledgerController = {
   createLedger: async (req, res) => {
     try {
-      const { title, debit, credit, role, supId, cusId, balance, hotelId } = req.body;
-      if (!title || !credit || !role || !balance || (!supId && !cusId)) {
+      const {
+        title,
+        debit,
+        credit,
+        role,
+        supId,
+        cusId,
+        bankId,
+        balance,
+        hotelId,
+      } = req.body;
+      if (
+        !title ||
+        !credit ||
+        !role ||
+        !balance ||
+        (!supId && !cusId && !bankId)
+      ) {
         throw new Error("Please Enter All Required Fields!");
       }
 
-      // Determine if this is a supplier or customer ledger
-      const idField = supId ? 'supId' : 'cusId';
-      const idValue = supId || cusId;
+      // Determine if this is a supplier, customer, or bank ledger
+      const idField = supId ? "supId" : cusId ? "cusId" : "bankId";
+      const idValue = supId || cusId || bankId;
 
       let ledger = await Ledger.findOne({ [idField]: idValue });
       const newEntry = {
@@ -31,7 +47,7 @@ const ledgerController = {
           [idField]: idValue,
           hotelId,
           role,
-          entries: [newEntry]
+          entries: [newEntry],
         });
       }
 
@@ -46,24 +62,32 @@ const ledgerController = {
 
   getLedger: async (req, res) => {
     try {
-      const { supplierId, hotelId } = req.query;
-      console.log(supplierId, hotelId)
-      if (!supplierId || !hotelId) {
-        return res.status(400).json({ message: 'Missing required query parameters.' });
+      const { supplierId, customerId, bankId, hotelId } = req.query;
+      if ((!supplierId && !customerId && !bankId) || !hotelId) {
+        return res
+          .status(400)
+          .json({ message: "Missing required query parameters." });
       }
 
-      const ledger = await Ledger.findOne({ supId: supplierId, hotelId: hotelId });
+      const idField = supplierId ? "supId" : customerId ? "cusId" : "bankId";
+      const idValue = supplierId || customerId || bankId;
+
+      const ledger = await Ledger.findOne({
+        [idField]: idValue,
+        hotelId: hotelId,
+      });
       if (ledger) {
-        res.status(200).json({ message: 'Ledger found.', ledger });
+        res.status(200).json({ message: "Ledger found.", ledger });
       } else {
-        res.status(404).json({ message: 'Ledger not found.' });
+        res.status(404).json({ message: "Ledger not found." });
       }
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: 'An error occurred while fetching the ledger.' });
+      res
+        .status(500)
+        .json({ message: "An error occurred while fetching the ledger." });
     }
   },
-
 
   filterLedger: async (req, res) => {
     try {
@@ -71,51 +95,59 @@ const ledgerController = {
       const { from, to } = req.query;
 
       if (!id || !from || !to) {
-        return res.status(400).json({ message: 'Missing required params.' });
+        return res.status(400).json({ message: "Missing required params." });
       }
 
       const fromDate = new Date(from);
       const toDate = new Date(to);
 
       const filteredLedgers = await Ledger.find({
-        $or: [{ supId: id }, { cusId: id }],
+        $or: [{ supId: id }, { cusId: id }, { bankId: id }],
         createdAt: {
           $gte: fromDate,
-          $lte: toDate
-        }
+          $lte: toDate,
+        },
       });
 
-      res.status(200).json({ message: 'Filtered ledgers successfully.', ledgers: filteredLedgers });
+      res.status(200).json({
+        message: "Filtered ledgers successfully.",
+        ledgers: filteredLedgers,
+      });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: 'An error occurred while fetching the ledgers...' });
+      res
+        .status(500)
+        .json({ message: "An error occurred while fetching the ledgers..." });
     }
   },
 
   filterAdminLedger: async (req, res) => {
     try {
-      // const { id } = req.params;
       const { from, to } = req.query;
 
-      if ( !from || !to) {
-        return res.status(400).json({ message: 'Missing required fields' });
+      if (!from || !to) {
+        return res.status(400).json({ message: "Missing required fields" });
       }
 
       const fromDate = new Date(from);
       const toDate = new Date(to);
 
       const filteredLedgers = await Ledger.find({
-        // $or: [{ supId: id }, { cusId: id }],
         createdAt: {
           $gte: fromDate,
-          $lte: toDate
-        }
+          $lte: toDate,
+        },
       });
 
-      res.status(200).json({ message: 'Filtered ledgers successfully.', ledgers: filteredLedgers });
+      res.status(200).json({
+        message: "Filtered ledgers successfully.",
+        ledgers: filteredLedgers,
+      });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: 'An error occurred while fetching the ledgers...' });
+      res
+        .status(500)
+        .json({ message: "An error occurred while fetching the ledgers..." });
     }
   },
 
@@ -123,7 +155,9 @@ const ledgerController = {
     try {
       const { role, to, from } = req.query;
       if (!role) {
-        return res.status(400).json({ message: 'Missing required role parameter.' });
+        return res
+          .status(400)
+          .json({ message: "Missing required role parameter." });
       }
 
       if (role && to && from) {
@@ -133,21 +167,27 @@ const ledgerController = {
           role,
           createdAt: {
             $gte: fromDate,
-            $lte: toDate
-          }
+            $lte: toDate,
+          },
         });
-        res.status(200).json({ message: 'Filtered ledgers successfully.', ledgers: filteredLedgers });
+        res.status(200).json({
+          message: "Filtered ledgers successfully.",
+          ledgers: filteredLedgers,
+        });
       } else {
         const ledgers = await Ledger.find({ role });
 
-        res.status(200).json({ message: 'Admin ledgers fetched successfully.', ledgers });
+        res
+          .status(200)
+          .json({ message: "Admin ledgers fetched successfully.", ledgers });
       }
-
     } catch (error) {
       console.error(error);
-      res.status(500).json({ message: 'An error occurred while fetching the ledgers.' });
+      res
+        .status(500)
+        .json({ message: "An error occurred while fetching the ledgers." });
     }
-  }
+  },
 };
 
 module.exports = ledgerController;

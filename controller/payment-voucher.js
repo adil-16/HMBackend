@@ -1,8 +1,9 @@
 const Ledger = require("../models/ledger");
+
 const paymentVoucherController = {
   debitpayment: async (req, res) => {
     try {
-      const { title, amount, supId, role } = req.body;
+      const { title, amount, supId, role, paymentMethod, bankId } = req.body;
       if (!title || !supId || !amount) {
         throw new Error("Please Enter All Required Fields!");
       }
@@ -22,62 +23,91 @@ const paymentVoucherController = {
         }, 0);
         ledger.totalBalance = totalBalance;
       } else {
-        ledger = new paymentVoucher({
+        ledger = new Ledger({
           supId,
+          role: "supplier",
           entries: [newEntry],
         });
       }
 
       await ledger.save();
-      if (role == "cash") {
+
+      if (paymentMethod === "cash" && role == "cash") {
         try {
-          let ledger = await Ledger.findOne({ role });
-          const newEntry = {
+          let cashLedger = await Ledger.findOne({ role: "cash" });
+          const cashEntry = {
             title: "Rooms",
             debit: 0,
             credit: amount,
             balance: 0 - amount,
           };
-          if (ledger) {
-            ledger.entries.push(newEntry);
-            let totalBalance = ledger.entries.reduce((acc, entr) => {
+          if (cashLedger) {
+            cashLedger.entries.push(cashEntry);
+            let totalBalance = cashLedger.entries.reduce((acc, entr) => {
               return acc + entr.balance;
             }, 0);
-            ledger.totalBalance = totalBalance;
+            cashLedger.totalBalance = totalBalance;
           } else {
-            ledger = new paymentVoucher({
-              supId,
-              entries: [newEntry],
+            cashLedger = new Ledger({
+              role: "cash",
+              entries: [cashEntry],
             });
           }
-
-          await ledger.save();
+          await cashLedger.save();
         } catch (error) {
-          console.error("Failed to updated Cash Ledger", error);
-          res.status(500).json({ message: error.message });
+          console.error("Failed to update Cash Ledger", error);
+          return res.status(500).json({
+            message: "Failed to update Cash Ledger: " + error.message,
+          });
+        }
+      } else if (paymentMethod === "bank" && bankId && role == "bank") {
+        try {
+          let bankLedger = await Ledger.findOne({ bankId, role: "bank" });
+          const bankEntry = {
+            title: "Booking Rooms",
+            debit: amount,
+            credit: 0,
+            balance: amount,
+          };
+          if (bankLedger) {
+            bankLedger.entries.push(bankEntry);
+            let totalBalance = bankLedger.entries.reduce((acc, entr) => {
+              return acc + entr.balance;
+            }, 0);
+            bankLedger.totalBalance = totalBalance;
+          } else {
+            bankLedger = new Ledger({
+              bankId,
+              entries: [bankEntry],
+            });
+          }
+          await bankLedger.save();
+        } catch (error) {
+          console.error("Failed to update Bank Ledger", error);
+          return res.status(500).json({
+            message: "Failed to update Bank Ledger: " + error.message,
+          });
         }
       }
 
-      res.status(201).json({ message: "Ledger updated successfully!", ledger });
+      res
+        .status(201)
+        .json({ message: "Ledgers updated successfully!", ledger });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: error.message });
     }
   },
+
   debitReceipt: async (req, res) => {
     try {
-      const { title, amount, cusId, role } = req.body;
+      const { title, amount, cusId, role, paymentMethod, bankId } = req.body;
       if (!title || !cusId || !amount) {
         throw new Error("Please Enter All Required Fields!");
       }
 
-      // Log the received payload
-      console.log("Received payload:", { title, amount, cusId, role });
-
       // Update customer ledger
       let ledger = await Ledger.findOne({ cusId });
-      console.log("Found customerLedger:", ledger);
-
       const newEntry = {
         title,
         debit: 0,
@@ -95,27 +125,22 @@ const paymentVoucherController = {
         ledger = new Ledger({
           cusId,
           role: "customer",
-          entries: [customerEntry],
+          entries: [newEntry],
         });
       }
 
       await ledger.save();
-      console.log("Updated customerLedger:", ledger);
 
       // Update cash ledger
-      let cashLedger;
-      if (role === "cash") {
+      if (paymentMethod === "cash") {
         try {
-          cashLedger = await Ledger.findOne({ role: "cash" });
-          console.log("Found cashLedger:", cashLedger);
-
+          let cashLedger = await Ledger.findOne({ role: "cash" });
           const cashEntry = {
             title: "Booking Rooms",
             debit: amount,
             credit: 0,
             balance: amount,
           };
-
           if (cashLedger) {
             cashLedger.entries.push(cashEntry);
             let totalBalance = cashLedger.entries.reduce((acc, entr) => {
@@ -128,26 +153,47 @@ const paymentVoucherController = {
               entries: [cashEntry],
             });
           }
-
           await cashLedger.save();
-          console.log("Updated cashLedger:", cashLedger);
         } catch (error) {
           console.error("Failed to update Cash Ledger", error);
-          return res
-            .status(500)
-            .json({
-              message: "Failed to update Cash Ledger: " + error.message,
+          return res.status(500).json({
+            message: "Failed to update Cash Ledger: " + error.message,
+          });
+        }
+      } else if (paymentMethod === "bank" && bankId) {
+        // Update bank ledger
+        try {
+          let bankLedger = await Ledger.findOne({ bankId });
+          const bankEntry = {
+            title: "Booking Rooms",
+            debit: amount,
+            credit: 0,
+            balance: amount,
+          };
+          if (bankLedger) {
+            bankLedger.entries.push(bankEntry);
+            let totalBalance = bankLedger.entries.reduce((acc, entr) => {
+              return acc + entr.balance;
+            }, 0);
+            bankLedger.totalBalance = totalBalance;
+          } else {
+            bankLedger = new Ledger({
+              bankId,
+              entries: [bankEntry],
             });
+          }
+          await bankLedger.save();
+        } catch (error) {
+          console.error("Failed to update Bank Ledger", error);
+          return res.status(500).json({
+            message: "Failed to update Bank Ledger: " + error.message,
+          });
         }
       }
 
       res
         .status(201)
-        .json({
-          message: "Ledgers updated successfully!",
-          ledger,
-          cashLedger,
-        });
+        .json({ message: "Ledgers updated successfully!", ledger });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: error.message });
