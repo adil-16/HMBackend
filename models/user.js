@@ -16,13 +16,13 @@ const userSchema = new Schema({
     enum: ["admin", "customer", "supplier"],
     required: true,
   },
-  customerType: {
-    type: String,
-    enum: ["guest", "b2b"],
-    required: function () {
-      return this.role === "customer";
-    },
-  },
+  // customerType: {
+  //   type: String,
+  //   enum: ["guest", "b2b"],
+  //   required: function () {
+  //     return this.role === "customer";
+  //   },
+  // },
   image: {
     type: String,
   },

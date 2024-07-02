@@ -25,29 +25,13 @@ const accommodationSchema = new mongoose.Schema({
   roomType: { type: String, required: true },
   checkin: { type: Date, required: true },
   checkout: { type: Date, required: true },
-  bedRate: {
-    type: Number,
-    required: function () {
-      return this.roomType === "Shared" && this.customerType === 'guest';
-    },
-  },
-  noOfBeds: {
-    type: Number,
-    required: function () {
-      return this.roomType === "Shared" && this.customerType === 'guest';
-    },
-  },
   roomRate: {
     type: Number,
-    required: function () {
-      return this.customerType !== 'guest' || this.roomType !== 'Shared';
-    },
+    required: true,
   },
   totalRooms: {
     type: Number,
-    required: function () {
-      return this.customerType !== 'guest' || this.roomType !== 'Shared';
-    },
+    required: true,
   },
 });
 
@@ -65,11 +49,11 @@ const voucherSchema = new mongoose.Schema({
       return this.confirmationStatus === "Tentative";
     },
   },
-  tentativeDate: { type: Date, default:null },
+  tentativeDate: { type: Date, default: null },
   confirmationType: {
     type: String,
     enum: ["Individual", "Group"],
-    default: "Individual",
+    default: "Group",
     required: true,
   },
   vatnumber: {
@@ -77,66 +61,22 @@ const voucherSchema = new mongoose.Schema({
     required: true,
   },
   accommodations: [accommodationSchema],
-  companyName: {
-    type: String,
-    required: false,
-  },
-  age: {
-    type: Number,
-    required: true,
-  },
-  passportNumber: {
-    type: String,
-    required: false,
-  },
   passengers: {
     type: [passSchema],
     required: true,
   },
-  gender: {
-    type: String,
-    enum: ["male", "female", "other"],
-    required: true,
-  },
 });
 
-// Middleware for validation and setting confirmationType
-voucherSchema.pre('validate', async function (next) {
-  if (this.isModified('customer')) {
-    try {
-      const User = mongoose.model('user');
-      const customer = await User.findById(this.customer);
-      
-      if (!customer) {
-        throw new Error('Customer not found');
-      }
-
-      if (customer.customerType === 'b2b') {
-        this.companyName = this.companyName || 'Default Company Name';
-        this.confirmationType = 'Group';
-      } else if (customer.customerType === 'guest') {
-        this.passportNumber = this.passportNumber || 'ABASV141';
-        this.confirmationType = 'Individual';
-      } else {
-        throw new Error('Unknown customer type');
-      }
-
-      // Assign customerType to accommodations
-      this.accommodations.forEach(accommodation => {
-        accommodation.customerType = customer.customerType;
-      });
-
-      if (this.confirmationStatus === "Tentative") {
-        this.tentativeDate = new Date(Date.now() + this.tentativeHours * 3600000); 
-      } else {
-        this.tentativeDate = null;
-      }
-      
-    } catch (error) {
-      next(error);
+voucherSchema.pre("validate", async function (next) {
+  try {
+    if (this.confirmationStatus === "Tentative") {
+      this.tentativeDate = new Date(Date.now() + this.tentativeHours * 3600000);
+    } else {
+      this.tentativeDate = null;
     }
+  } catch (error) {
+    next(error);
   }
-
   next();
 });
 

@@ -13,64 +13,76 @@ const voucherController = {
         confirmationStatus,
         tentativeHours,
         vatnumber,
-        age,
-        passportNumber,
         passengers,
-        gender,
       } = req.body;
 
       // Validate tentativeHours
       if (confirmationStatus === "Tentative") {
         if (tentativeHours < 24 || tentativeHours > 120) {
-          return res.status(400).send({ success: false, data: { error: "Tentative hours must be between 24 and 120." } });
+          return res.status(400).send({
+            success: false,
+            data: { error: "Tentative hours must be between 24 and 120." },
+          });
         }
       }
 
       // Validate customer
       const customerRecord = await User.findById(customer);
       if (!customerRecord) {
-        return res.status(404).send({ success: false, data: { error: "Customer not found" } });
+        return res
+          .status(404)
+          .send({ success: false, data: { error: "Customer not found" } });
       }
 
       // Validate accommodations and their hotels
       let totalAmount = 0;
       for (let accommodation of accommodations) {
-        console.log("accomd", accommodation.hotel)
+        console.log("accomd", accommodation.hotel);
         const hotelRecord = await Hotel.findById(accommodation.hotel);
         if (!hotelRecord) {
-          return res.status(404).send({ success: false, data: { error: `Hotel with id ${accommodation.hotel} not found` } });
+          return res.status(404).send({
+            success: false,
+            data: { error: `Hotel with id ${accommodation.hotel} not found` },
+          });
         }
 
         // Calculate the total amount based on customerType
-        const nights = Math.ceil((new Date(accommodation.checkout) - new Date(accommodation.checkin)) / (1000 * 60 * 60 * 24));
-        if (customerRecord.customerType === 'b2b') {
+        const nights = Math.ceil(
+          (new Date(accommodation.checkout) - new Date(accommodation.checkin)) /
+            (1000 * 60 * 60 * 24)
+        );
+        if (customerRecord) {
           if (!accommodation.roomRate) {
-            return res.status(400).send({ success: false, data: { error: "Room rate is required for b2b customers" } });
+            return res.status(400).send({
+              success: false,
+              data: { error: "Room rate is required for b2b customers" },
+            });
           }
           if (!accommodation.totalRooms) {
-            return res.status(400).send({ success: false, data: { error: "Total rooms is required for b2b customers" } });
+            return res.status(400).send({
+              success: false,
+              data: { error: "Total rooms is required for b2b customers" },
+            });
           }
           amount = accommodation.roomRate * accommodation.totalRooms * nights;
-        } else { // Assuming customerType is 'guest'
-          if (accommodation.roomType === "Shared") {
-            if (!accommodation.bedRate) {
-              return res.status(400).send({ success: false, data: { error: "Bed rate is required for shared rooms" } });
-            }
-            if (!accommodation.noOfBeds) {
-              return res.status(400).send({ success: false, data: { error: "Number of beds is required for shared rooms" } });
-            }
-            amount = accommodation.bedRate * accommodation.noOfBeds * nights;
-          } else {
-            if (!accommodation.roomRate) {
-              return res.status(400).send({ success: false, data: { error: "Room rate is required for non-shared rooms" } });
-            }
-            if (!accommodation.totalRooms) {
-              return res.status(400).send({ success: false, data: { error: "Total rooms is required for non-shared rooms" } });
-            }
-            amount = accommodation.roomRate * accommodation.totalRooms * nights;
+        } else {
+          if (!accommodation.roomRate) {
+            return res.status(400).send({
+              success: false,
+              data: { error: "Room rate is required for non-shared rooms" },
+            });
           }
+          if (!accommodation.totalRooms) {
+            return res.status(400).send({
+              success: false,
+              data: {
+                error: "Total rooms is required for non-shared rooms",
+              },
+            });
+          }
+          amount = accommodation.roomRate * accommodation.totalRooms * nights;
         }
-  
+
         totalAmount += amount;
       }
 
@@ -79,19 +91,20 @@ const voucherController = {
         voucherNumber,
         customer,
         confirmationStatus,
-        tentativeHours: confirmationStatus === "Tentative" ? tentativeHours : null,
+        tentativeHours:
+          confirmationStatus === "Tentative" ? tentativeHours : null,
         vatnumber,
         accommodations,
-        age,
-        passportNumber,
         passengers,
-        gender,
       });
 
       const savedVoucher = await voucher.save();
 
       // Update ledger for customer and cash
-      let customerLedger = await Ledger.findOne({ cusId: customer, role: "customer" });
+      let customerLedger = await Ledger.findOne({
+        cusId: customer,
+        role: "customer",
+      });
       let cashLedger = await Ledger.findOne({ role: "cash" });
 
       const customerEntry = {
@@ -146,7 +159,9 @@ const voucherController = {
       });
     } catch (error) {
       console.error(error);
-      return res.status(500).send({ success: false, data: { error: error.message } });
+      return res
+        .status(500)
+        .send({ success: false, data: { error: error.message } });
     }
   },
   async getFilteredVouchers(req, res) {
@@ -158,17 +173,14 @@ const voucherController = {
         hotelId,
         confirmationStatus,
         duration,
-        customerId,
       } = req.query;
 
       // Validate the input
       if (!reportType || !hotelId || !confirmationStatus) {
-        return res
-          .status(400)
-          .send({
-            success: false,
-            data: { error: "Missing required query parameters" },
-          });
+        return res.status(400).send({
+          success: false,
+          data: { error: "Missing required query parameters" },
+        });
       }
 
       let from, to;
@@ -185,22 +197,18 @@ const voucherController = {
         to = new Date(tomorrow.setHours(23, 59, 59, 999));
       } else if (duration === "Custom") {
         if (!fromDate || !toDate) {
-          return res
-            .status(400)
-            .send({
-              success: false,
-              data: { error: "Missing required query parameters" },
-            });
+          return res.status(400).send({
+            success: false,
+            data: { error: "Missing required query parameters" },
+          });
         }
         from = new Date(fromDate);
         to = new Date(toDate);
       } else {
-        return res
-          .status(400)
-          .send({
-            success: false,
-            data: { error: "Invalid duration selected" },
-          });
+        return res.status(400).send({
+          success: false,
+          data: { error: "Invalid duration selected" },
+        });
       }
 
       // Determine the filter field based on the reportType
@@ -228,21 +236,15 @@ const voucherController = {
         "accommodations.hotel": hotelId,
         [dateFilterField]: { $gte: from, $lte: to },
       };
-      // Add customer filter if customerId is provided
-      if (customerId) {
-        query["customer"] = customerId;
-      }
 
       // Find vouchers matching the criteria
       const vouchers = await Voucher.find(query).populate("customer");
 
       if (!vouchers.length) {
-        return res
-          .status(404)
-          .send({
-            success: false,
-            data: { error: "No vouchers found matching the criteria" },
-          });
+        return res.status(404).send({
+          success: false,
+          data: { error: "No vouchers found matching the criteria" },
+        });
       }
 
       // Helper function to classify the ages
@@ -259,7 +261,7 @@ const voucherController = {
         let childCount = 0;
         let infantCount = 0;
 
-        const customerAge = voucher.customer.age;
+        const customerAge = voucher.age;
         if (customerAge !== undefined) {
           const customerType = getPaxType(customerAge);
           if (customerType === "adult") adultCount++;
@@ -267,11 +269,8 @@ const voucherController = {
           if (customerType === "infant") infantCount++;
         }
 
-        if (
-          voucher.customer.passengers &&
-          Array.isArray(voucher.customer.passengers)
-        ) {
-          voucher.customer.passengers.forEach((passenger) => {
+        if (voucher.passengers && Array.isArray(voucher.passengers)) {
+          voucher.passengers.forEach((passenger) => {
             const passengerAge = passenger.age;
             if (passengerAge !== undefined) {
               const passengerType = getPaxType(passengerAge);

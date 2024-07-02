@@ -23,20 +23,6 @@ const userController = {
         user.password = await bcrypt.hash(user.password, salt);
       }
 
-      if (user.role === "customer") {
-        if (!userData.customerType) {
-         
-            return res.status(400).send({
-              success: false,
-              data: {
-                error:
-                  "Customer Type is required",
-              },
-            });
-  
-          }
-        }
-
       await user.save();
       const token = jwt.sign(
         { _id: user._id, role: user.role },
@@ -173,8 +159,6 @@ const userController = {
         data.image = fileBuffer;
       }
 
-      // Parse passengers array correctly if it's a string
-
       const updatedUser = await User.findByIdAndUpdate(id, data, { new: true });
       return res.status(200).send({
         success: true,
@@ -215,7 +199,6 @@ const userController = {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        customerType: user.customerType || "",
         image: user.image,
         isSelected: false,
       }));
@@ -245,17 +228,9 @@ const userController = {
           email: user.email,
           phone: user.phone,
           role: user.role,
-          customerType: user.customerType || "",
           image: user.image,
           isSelected: false,
         };
-
-        if (user.role === "customer") {
-          if (user.customerType === "guest") {
-            userData.passportNumber = user.passportNumber || "";
-          }
-          userData.passengers = user.passengers || [];
-        }
 
         return userData;
       });
@@ -315,7 +290,6 @@ const userController = {
         email: customer.email,
         phone: customer.phone,
         role: customer.role,
-        customerType: customer.customerType || "",
         image: customer.image,
         isSelected: false,
       }));
