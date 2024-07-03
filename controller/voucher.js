@@ -14,8 +14,8 @@ const voucherController = {
         tentativeHours,
         vatnumber,
         passengers,
-        bankId, // New addition: Bank ID from request body
-        paymentMethod, // New addition: Payment method (cash or bank)
+        bankId,
+        paymentMethod,
       } = req.body;
 
       // Validate tentativeHours
@@ -150,7 +150,7 @@ const voucherController = {
           bankLedger.totalBalance -= totalAmount;
         } else {
           bankLedger = new Ledger({
-            bankId, // Use provided bankId
+            bankId,
             hotelId: accommodations[0].hotel,
             role: "bank",
             entries: [bankEntry],

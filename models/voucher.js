@@ -18,6 +18,10 @@ const passSchema = new mongoose.Schema({
     enum: ["male", "female", "other"],
     required: true,
   },
+  nationality: {
+    type: String,
+    required: true,
+  },
 });
 
 const accommodationSchema = new mongoose.Schema({
