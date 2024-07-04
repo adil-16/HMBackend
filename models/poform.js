@@ -6,14 +6,16 @@ const Schema = mongoose.Schema;
 const poformSchema = new Schema({
   supplierID: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'user',
+    ref: "user",
     required: true,
   },
-  hotelID: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'hotel',
-    required: true
-  }],
+  hotelID: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "hotel",
+      required: true,
+    },
+  ],
   checkin: {
     type: Date,
     required: true,
@@ -41,7 +43,7 @@ const poformSchema = new Schema({
     },
   },
   bedRates: {
-    shared: {
+    quint: {
       type: Number,
       // required: true,
     },
