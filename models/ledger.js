@@ -17,6 +17,10 @@ const entrySchema = new mongoose.Schema(
     balance: {
       type: Number,
     },
+    conversionRate: {
+      type: Number,
+      default: 1,
+    },
   },
   { timestamps: true }
 );

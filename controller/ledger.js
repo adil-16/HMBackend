@@ -13,6 +13,7 @@ const ledgerController = {
         bankId,
         balance,
         hotelId,
+        conversionRate = 1,
       } = req.body;
       if (
         !title ||
@@ -24,7 +25,6 @@ const ledgerController = {
         throw new Error("Please Enter All Required Fields!");
       }
 
-      // Determine if this is a supplier, customer, or bank ledger
       const idField = supId ? "supId" : cusId ? "cusId" : "bankId";
       const idValue = supId || cusId || bankId;
 
@@ -34,12 +34,13 @@ const ledgerController = {
         debit: debit || 0,
         credit,
         balance,
+        conversionRate,
       };
 
       if (ledger) {
         ledger.entries.push(newEntry);
-        let totalBalance = ledger.entries.reduce((acc, entr) => {
-          return acc + entr.balance;
+        let totalBalance = ledger.entries.reduce((acc, entry) => {
+          return acc + entry.balance;
         }, 0);
         ledger.totalBalance = totalBalance;
       } else {
@@ -62,7 +63,7 @@ const ledgerController = {
 
   getLedger: async (req, res) => {
     try {
-      const { supplierId, customerId, bankId, hotelId } = req.query;
+      const { supplierId, customerId, bankId, hotelId, currency } = req.query;
       if ((!supplierId && !customerId && !bankId) || !hotelId) {
         return res
           .status(400)
@@ -76,7 +77,16 @@ const ledgerController = {
         [idField]: idValue,
         hotelId: hotelId,
       });
+
       if (ledger) {
+        if (currency === "PKR") {
+          ledger.entries = ledger.entries.map((entry) => ({
+            ...entry.toObject(),
+            debit: entry.debit * entry.conversionRate,
+            credit: entry.credit * entry.conversionRate,
+            balance: entry.balance * entry.conversionRate,
+          }));
+        }
         res.status(200).json({ message: "Ledger found.", ledger });
       } else {
         res.status(404).json({ message: "Ledger not found." });
@@ -92,7 +102,7 @@ const ledgerController = {
   filterLedger: async (req, res) => {
     try {
       const { id } = req.params;
-      const { from, to } = req.query;
+      const { from, to, currency } = req.query;
 
       if (!id || !from || !to) {
         return res.status(400).json({ message: "Missing required params." });
@@ -109,6 +119,22 @@ const ledgerController = {
         },
       });
 
+      if (currency === "PKR") {
+        filteredLedgers.forEach((ledger) => {
+          ledger.entries = ledger.entries.map((entry) => ({
+            ...entry.toObject(),
+            debit: entry.debit * entry.conversionRate,
+            credit: entry.credit * entry.conversionRate,
+            balance: entry.balance * entry.conversionRate,
+          }));
+
+          // Calculate total balance in PKR for each ledger
+          ledger.totalBalance = ledger.entries.reduce((acc, entry) => {
+            return acc + entry.balance;
+          }, 0);
+        });
+      }
+
       res.status(200).json({
         message: "Filtered ledgers successfully.",
         ledgers: filteredLedgers,
@@ -123,7 +149,7 @@ const ledgerController = {
 
   filterAdminLedger: async (req, res) => {
     try {
-      const { from, to } = req.query;
+      const { from, to, currency } = req.query;
 
       if (!from || !to) {
         return res.status(400).json({ message: "Missing required fields" });
@@ -139,6 +165,22 @@ const ledgerController = {
         },
       });
 
+      if (currency === "PKR") {
+        filteredLedgers.forEach((ledger) => {
+          ledger.entries = ledger.entries.map((entry) => ({
+            ...entry.toObject(),
+            debit: entry.debit * entry.conversionRate,
+            credit: entry.credit * entry.conversionRate,
+            balance: entry.balance * entry.conversionRate,
+          }));
+
+          // Calculate total balance in PKR for each ledger
+          ledger.totalBalance = ledger.entries.reduce((acc, entry) => {
+            return acc + entry.balance;
+          }, 0);
+        });
+      }
+
       res.status(200).json({
         message: "Filtered ledgers successfully.",
         ledgers: filteredLedgers,
@@ -151,9 +193,32 @@ const ledgerController = {
     }
   },
 
+  updateCurrencyRate: async (req, res) => {
+    try {
+      const { rate } = req.body;
+
+      if (!rate) {
+        return res.status(400).json({ message: "Rate is required." });
+      }
+
+      // Update all ledger entries with the new conversion rate
+      await Ledger.updateMany(
+        {},
+        { $set: { "entries.$[].conversionRate": rate } }
+      );
+
+      res.status(200).json({ message: "Currency rate updated successfully." });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({
+        message: "An error occurred while updating the currency rate.",
+      });
+    }
+  },
+
   getAdminLedger: async (req, res) => {
     try {
-      const { role, to, from } = req.query;
+      const { role, to, from, currency } = req.query;
       if (!role) {
         return res
           .status(400)
@@ -170,12 +235,35 @@ const ledgerController = {
             $lte: toDate,
           },
         });
+
+        if (currency === "PKR") {
+          filteredLedgers.forEach((ledger) => {
+            ledger.entries = ledger.entries.map((entry) => ({
+              ...entry.toObject(),
+              debit: entry.debit * entry.conversionRate,
+              credit: entry.credit * entry.conversionRate,
+              balance: entry.balance * entry.conversionRate,
+            }));
+          });
+        }
+
         res.status(200).json({
           message: "Filtered ledgers successfully.",
           ledgers: filteredLedgers,
         });
       } else {
         const ledgers = await Ledger.find({ role });
+
+        if (currency === "PKR") {
+          ledgers.forEach((ledger) => {
+            ledger.entries = ledger.entries.map((entry) => ({
+              ...entry.toObject(),
+              debit: entry.debit * entry.conversionRate,
+              credit: entry.credit * entry.conversionRate,
+              balance: entry.balance * entry.conversionRate,
+            }));
+          });
+        }
 
         res
           .status(200)
