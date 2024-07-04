@@ -83,6 +83,42 @@ const voucherController = {
         }
 
         totalAmount += amount;
+
+        let roomsAvailable = hotelRecord.rooms.filter(
+          (room) => room.roomType === accommodation.roomType
+        ).length;
+
+        if (accommodation.totalRooms > roomsAvailable) {
+          return res.status(400).send({
+            success: false,
+            data: {
+              error: `Not enough ${accommodation.roomType} rooms available`,
+            },
+          });
+        }
+
+        let totalRoomsToBook = accommodation.totalRooms;
+
+        for (let room of hotelRecord.rooms) {
+          if (room.roomType === accommodation.roomType) {
+            if (totalRoomsToBook <= 0) break;
+
+            if (!room.beds.some((bed) => bed.isBooked)) {
+              room.beds.forEach((bed) => {
+                bed.isBooked = true;
+                bed.Booking = {
+                  from: accommodation.checkin,
+                  to: accommodation.checkout,
+                };
+                bed.customer = customer;
+              });
+
+              totalRoomsToBook--;
+            }
+          }
+        }
+
+        await hotelRecord.save();
       }
 
       // Create voucher
@@ -378,3 +414,247 @@ const voucherController = {
 };
 
 module.exports = voucherController;
+
+// async createVoucher(req, res) {
+//   try {
+//     const {
+//       voucherNumber,
+//       customer,
+//       accommodations,
+//       confirmationStatus,
+//       tentativeHours,
+//       vatnumber,
+//       passengers,
+//       bankId,
+//       paymentMethod,
+//     } = req.body;
+
+//     // Validate tentativeHours
+//     if (confirmationStatus === "Tentative") {
+//       if (tentativeHours < 24 || tentativeHours > 120) {
+//         return res.status(400).send({
+//           success: false,
+//           data: { error: "Tentative hours must be between 24 and 120." },
+//         });
+//       }
+//     }
+
+//     // Validate customer
+//     const customerRecord = await User.findById(customer);
+//     if (!customerRecord) {
+//       return res
+//         .status(404)
+//         .send({ success: false, data: { error: "Customer not found" } });
+//     }
+
+//     // Validate accommodations and their hotels
+//     let totalAmount = 0;
+//     for (let accommodation of accommodations) {
+//       const hotelRecord = await Hotel.findById(accommodation.hotel);
+//       if (!hotelRecord) {
+//         return res.status(404).send({
+//           success: false,
+//           data: { error: `Hotel with id ${accommodation.hotel} not found` },
+//         });
+//       }
+
+//       // Calculate the total amount based on customerType
+//       const nights = Math.ceil(
+//         (new Date(accommodation.checkout) - new Date(accommodation.checkin)) /
+//           (1000 * 60 * 60 * 24)
+//       );
+//       if (customerRecord) {
+//         if (!accommodation.roomRate) {
+//           return res.status(400).send({
+//             success: false,
+//             data: { error: "Room rate is required for b2b customers" },
+//           });
+//         }
+//         if (!accommodation.totalRooms) {
+//           return res.status(400).send({
+//             success: false,
+//             data: { error: "Total rooms is required for b2b customers" },
+//           });
+//         }
+//         amount = accommodation.roomRate * accommodation.totalRooms * nights;
+//       } else {
+//         if (!accommodation.roomRate) {
+//           return res.status(400).send({
+//             success: false,
+//             data: { error: "Room rate is required for non-shared rooms" },
+//           });
+//         }
+//         if (!accommodation.totalRooms) {
+//           return res.status(400).send({
+//             success: false,
+//             data: { error: "Total rooms is required for non-shared rooms" },
+//           });
+//         }
+//         amount = accommodation.roomRate * accommodation.totalRooms * nights;
+//       }
+
+//       totalAmount += amount;
+//       let totalRoomsToBook = accommodation.totalRooms;
+//       let roomsAvailable = hotelRecord.rooms.filter(room => room.roomType === accommodation.roomType).length;
+//       let bedsAvailable = hotelRecord.rooms
+//         .filter(room => room.roomType === accommodation.roomType)
+//         .reduce((sum, room) => sum + room.beds.filter(bed => !bed.isBooked).length, 0);
+
+//       // Check if enough rooms are available
+//       if (totalRoomsToBook > roomsAvailable || totalRoomsToBook > bedsAvailable) {
+//         return res.status(400).send({
+//           success: false,
+//           data: {
+//             error: `Not enough ${accommodation.roomType} rooms available`,
+//           },
+//         });
+//       }
+
+//       for (let room of hotelRecord.rooms) {
+//         if (room.roomType === accommodation.roomType) {
+//           if (totalRoomsToBook <= 0) break;
+
+//           let bedsToBook = room.beds.filter(bed => !bed.isBooked).length;
+
+//           if (bedsToBook > 0) {
+//             room.beds.forEach(bed => {
+//               if (!bed.isBooked && totalRoomsToBook > 0) {
+//                 bed.isBooked = true;
+//                 bed.Booking = {
+//                   from: accommodation.checkin,
+//                   to: accommodation.checkout,
+//                 };
+//                 bed.customer = customer;
+//                 totalRoomsToBook--;
+//               }
+//             });
+//           } else {
+//             return res.status(400).send({
+//               success: false,
+//               data: {
+//                 error: `Not enough beds available in ${room.roomType}`,
+//               },
+//             });
+//           }
+//         }
+//       }
+
+//       await hotelRecord.save();
+//     }
+
+//     // Create voucher
+//     const voucher = new Voucher({
+//       voucherNumber,
+//       customer,
+//       confirmationStatus,
+//       tentativeHours:
+//         confirmationStatus === "Tentative" ? tentativeHours : null,
+//       vatnumber,
+//       accommodations,
+//       passengers,
+//     });
+
+//     const savedVoucher = await voucher.save();
+
+//     // Update ledger based on payment method
+//     let customerLedger = await Ledger.findOne({
+//       cusId: customer,
+//       role: "customer",
+//     });
+//     let cashLedger = null;
+//     let bankLedger = null;
+
+//     const customerEntry = {
+//       title: "Booking",
+//       debit: totalAmount,
+//       credit: 0,
+//       balance: totalAmount,
+//     };
+
+//     if (paymentMethod === "cash") {
+//       cashLedger = await Ledger.findOne({ role: "cash" });
+
+//       const cashEntry = {
+//         title: "Booking",
+//         debit: 0,
+//         credit: totalAmount,
+//         balance: -totalAmount,
+//       };
+
+//       if (cashLedger) {
+//         cashLedger.entries.push(cashEntry);
+//         cashLedger.totalBalance -= totalAmount;
+//       } else {
+//         cashLedger = new Ledger({
+//           hotelId: accommodations[0].hotel,
+//           role: "cash",
+//           entries: [cashEntry],
+//           totalBalance: -totalAmount,
+//         });
+//       }
+//     } else if (paymentMethod === "bank" && bankId) {
+//       bankLedger = await Ledger.findOne({ role: "bank", bankId });
+
+//       const bankEntry = {
+//         title: "Booking",
+//         debit: 0,
+//         credit: totalAmount,
+//         balance: -totalAmount,
+//       };
+
+//       if (bankLedger) {
+//         bankLedger.entries.push(bankEntry);
+//         bankLedger.totalBalance -= totalAmount;
+//       } else {
+//         bankLedger = new Ledger({
+//           bankId,
+//           hotelId: accommodations[0].hotel,
+//           role: "bank",
+//           entries: [bankEntry],
+//           totalBalance: -totalAmount,
+//         });
+//       }
+//     }
+
+//     // Save ledgers
+//     if (customerLedger) {
+//       customerLedger.entries.push(customerEntry);
+//       customerLedger.totalBalance += totalAmount;
+//     } else {
+//       customerLedger = new Ledger({
+//         cusId: customer,
+//         hotelId: accommodations[0].hotel,
+//         role: "customer",
+//         entries: [customerEntry],
+//         totalBalance: totalAmount,
+//       });
+//     }
+
+//     await customerLedger.save();
+//     if (cashLedger) await cashLedger.save();
+//     if (bankLedger) await bankLedger.save();
+
+//     return res.status(201).send({
+//       success: true,
+//       data: {
+//         message: "Voucher created successfully",
+//         voucher: savedVoucher,
+//         customer: customerRecord,
+//       },
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res
+//       .status(500)
+//       .send({ success: false, data: { error: error.message } });
+//   }
+// }
+
+// I am giving roomType double and totalRooms 1 ,it is traversing array of rooms and when found same roomType but beds in that are booked it is showing error but what if after that room another roomType double found with all the beds unbooked as i only want 1 and found
+
+// make it genral for all room types and totalRooms
+
+// Also keep in mind to Make sure to handle case that if user gives input of roomType shared and totalRooms 10 in accomodations and we have only 2 or 3 rooms of shared type in that hotel then give error
+// also if user input 2 rooms then we have 2 rooms of shared but all beds in that 2 are booked or likewise cases
+
+// Not only for shared type and particular input, for all 4 types of rooms
