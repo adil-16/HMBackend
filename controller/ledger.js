@@ -119,6 +119,12 @@ const ledgerController = {
         },
       });
 
+      if (filteredLedgers.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "No Ledger record found between selected dates" });
+      }
+
       if (currency === "PKR") {
         filteredLedgers.forEach((ledger) => {
           ledger.entries = ledger.entries.map((entry) => ({
@@ -164,6 +170,12 @@ const ledgerController = {
           $lte: toDate,
         },
       });
+
+      if (filteredLedgers.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "No Ledger record found between selected dates" });
+      }
 
       if (currency === "PKR") {
         filteredLedgers.forEach((ledger) => {
