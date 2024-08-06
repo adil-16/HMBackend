@@ -1,3 +1,4 @@
+const { required } = require("@hapi/joi/lib/base");
 const mongoose = require("mongoose");
 
 const passSchema = new mongoose.Schema({
@@ -37,6 +38,11 @@ const accommodationSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  roomsList: [
+    {
+      type: mongoose.Schema.Types.ObjectId
+    }
+  ]
 });
 
 const voucherSchema = new mongoose.Schema({
@@ -68,7 +74,7 @@ const voucherSchema = new mongoose.Schema({
   passengers: {
     type: [passSchema],
     required: true,
-  },
+  }
 });
 
 voucherSchema.pre("validate", async function (next) {

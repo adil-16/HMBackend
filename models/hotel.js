@@ -45,6 +45,27 @@ const roomSchema = new Schema({
     type: Number,
     required: true,
   },
+  suplierData: {
+    type: [
+      {
+        poformData: {type: mongoose.Schema.ObjectId, ref: "poform"},
+        bedPrice: Number,
+        checkinDate: Date,
+        checkoutDate: Date
+      }
+    ],
+    required: true
+  },
+  customersData: {
+    type: [
+      {
+        voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
+        checkinDate: Date,
+        checkoutDate: Date,
+        bedPrice: Number
+      }
+    ]
+  },
   beds: [bedSchema]
 });
 

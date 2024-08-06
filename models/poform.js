@@ -16,6 +16,11 @@ const poformSchema = new Schema({
       required: true,
     },
   ],
+  roomsList: [
+    {
+      type: mongoose.Schema.Types.ObjectId
+    }
+  ],
   checkin: {
     type: Date,
     required: true,
