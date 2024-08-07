@@ -45,6 +45,19 @@ const roomSchema = new Schema({
     type: Number,
     required: true,
   },
+  bedRate: Number,
+  checkinDate: Date,
+  checkoutDate: Date,
+  customersData: {
+    type: [
+      {
+        voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
+        checkinDate: Date,
+        checkoutDate: Date,
+        roomRate: Number
+      }
+    ]
+  },
   beds: [bedSchema]
 });
 

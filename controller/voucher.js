@@ -3,6 +3,40 @@ const User = require("../models/user");
 const Voucher = require("../models/voucher");
 const Ledger = require("../models/ledger");
 
+function getAvailableRooms(hotelRecord, accommodation) {
+  // Filter rooms based on accommodation's room type and date range
+  const availableRooms = hotelRecord.rooms.filter((room) => {
+    // Check if the room type matches
+    if (room.roomType !== accommodation.roomType) {
+      return false;
+    }
+
+    // Check if accommodation's dates fall within room's checkin and checkout dates
+    if (
+      accommodation.checkin < room.checkinDate ||
+      accommodation.checkout > room.checkoutDate
+    ) {
+      return false;
+    }
+
+    // Check if accommodation's dates intersect with any of the customer's data dates
+    const isIntersectingWithCustomerData = room.customersData.some((customer) => {
+      return (
+        (accommodation.checkin.getTime() == customer.checkoutDate.getTime()) || // Covering Edge Case
+        (accommodation.checkin >= customer.checkinDate && accommodation.checkin < customer.checkoutDate) ||
+        (accommodation.checkout > customer.checkinDate && accommodation.checkout <= customer.checkoutDate) ||
+        (accommodation.checkin <= customer.checkinDate && accommodation.checkout >= customer.checkoutDate)
+      );
+    });
+
+    // If there's an intersection with customer data, the room is not available
+    return !isIntersectingWithCustomerData;
+  });
+
+  // Return the number of available rooms
+  return availableRooms;
+}
+
 const voucherController = {
   async createVoucher(req, res) {
     try {
@@ -39,6 +73,8 @@ const voucherController = {
       // Validate accommodations and their hotels
       let totalAmount = 0;
       for (let accommodation of accommodations) {
+        accommodation.checkin = new Date(accommodation.checkin)
+        accommodation.checkout = new Date(accommodation.checkout)
         const hotelRecord = await Hotel.findById(accommodation.hotel);
         if (!hotelRecord) {
           return res.status(404).send({
@@ -84,11 +120,10 @@ const voucherController = {
 
         totalAmount += amount;
 
-        let roomsAvailable = hotelRecord.rooms.filter(
-          (room) => room.roomType === accommodation.roomType
-        ).length;
+        //Also Checking if room is booked or not for that date.
+        let availableRooms = getAvailableRooms(hotelRecord, accommodation)
 
-        if (accommodation.totalRooms > roomsAvailable) {
+        if (accommodation.totalRooms > availableRooms.length) {
           return res.status(400).send({
             success: false,
             data: {
@@ -97,28 +132,8 @@ const voucherController = {
           });
         }
 
-        let totalRoomsToBook = accommodation.totalRooms;
-
-        for (let room of hotelRecord.rooms) {
-          if (room.roomType === accommodation.roomType) {
-            if (totalRoomsToBook <= 0) break;
-
-            if (!room.beds.some((bed) => bed.isBooked)) {
-              room.beds.forEach((bed) => {
-                bed.isBooked = true;
-                bed.Booking = {
-                  from: accommodation.checkin,
-                  to: accommodation.checkout,
-                };
-                bed.customer = customer;
-              });
-
-              totalRoomsToBook--;
-            }
-          }
-        }
-
-        await hotelRecord.save();
+         accommodation.rooms = availableRooms;
+         accommodation.hotelRecord = hotelRecord;
       }
 
       // Create voucher
@@ -133,6 +148,42 @@ const voucherController = {
         passengers,
       });
 
+
+      for(let accommodation of accommodations){
+        let hotelRecord = await Hotel.findById(accommodation.hotel);
+        let roomsAdded = [];
+        for(let i = 0; i<accommodation.totalRooms; i++){
+            console.log(accommodation.rooms[i])
+            let room = accommodation.rooms[i];
+            if (!room.beds.some((bed) => bed.isBooked)) {
+              room.beds.forEach((bed) => {
+                bed.isBooked = true;
+                bed.Booking = {
+                  from: accommodation.checkin,
+                  to: accommodation.checkout,
+                };
+                bed.customer = customer;
+              });
+            }
+            room.customersData.push({
+              voucherId: voucher._id,
+              checkinDate: accommodation.checkin,
+              checkoutDate: accommodation.checkout,
+              roomRate: accommodation.roomRate
+            })
+            roomsAdded.push(room);
+            console.log(roomsAdded);
+            
+          }
+        hotelRecord.rooms = hotelRecord.rooms.map((room)=>{
+          let newRoom = roomsAdded.find(newlyAddedRoom => room._id.equals(newlyAddedRoom._id));
+          if(!newRoom)
+            return room;
+          return newRoom;
+        }) 
+        await hotelRecord.save();
+      }
+      
       const savedVoucher = await voucher.save();
 
       // Update ledger based on payment method

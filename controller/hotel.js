@@ -211,7 +211,7 @@ const hotelController = {
       } else {
         const updatedData = req.body;
         const hotel = await Hotel.findOne({ _id: id });
-
+        console.log(updatedData);
         if (!hotel) {
           return res
             .status(404)
@@ -333,6 +333,7 @@ const hotelController = {
           }));
 
           roomTypes.push({
+            _id: room._id,
             type: room.roomType,
             roomNumber: room.roomNumber,
             totalBeds: roomTypeCount,

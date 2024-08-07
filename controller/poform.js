@@ -2,6 +2,7 @@ const Poform = require("../models/poform");
 const User = require("../models/user");
 const Hotel = require("../models/hotel");
 const Ledger = require("../models/ledger");
+const hotelServices = require("../services/hotel");
 const poformController = {
   async createPoform(req, res) {
     const {
@@ -14,6 +15,7 @@ const poformController = {
       debit,
       credit,
       role,
+      roomDetails
     } = req.body;
     try {
       // Validate input
@@ -23,16 +25,20 @@ const poformController = {
         !checkin ||
         !checkout ||
         !rooms ||
-        !bedRates
+        !bedRates ||
+        !roomDetails
       ) {
         return res
           .status(400)
           .send({ success: false, data: { error: "Invalid input" } });
       }
-
       // Calculate the number of nights
       const checkinDate = new Date(checkin);
       const checkoutDate = new Date(checkout);
+      
+      //Adding Rooms in Hotel
+      let newRooms = await hotelServices.addHotelRooms(hotelID, roomDetails, checkinDate, checkoutDate);
+
       const nights = Math.ceil(
         (checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)
       );
