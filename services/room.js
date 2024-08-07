@@ -1,5 +1,11 @@
 const Hotel = require("../models/hotel");
 
+function getDayName(date) {
+    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayIndex = date.getDay(); // getDay() returns a number from 0 to 6
+    return daysOfWeek[dayIndex];
+  }
+
 const roomServices = {
     dateRange(startDate, endDate) {
         const start = new Date(startDate);
@@ -22,6 +28,8 @@ const roomServices = {
         
         let dailyData = [];
 
+        let newCost = cost;
+
         for(let i =0; i<dates.length; i++){
             let singleDate = dates[i];
 
@@ -35,13 +43,26 @@ const roomServices = {
                 }
             });
 
+            if(sellingPrice == 0){
+                newCost += (newCost / (dates.length -(i+1)))
+            }
+            else
+            {
+                if(newCost != cost){
+                    for(let i = dailyData.length - 1; i>=0 && dailyData[i].booking != "Booked"; i--){
+                        dailyData[i].cost = 0;
+                        dailyData[i].profit = 0
+                    }
+                }
+                cost = newCost
+            }
             // Calculate the profit
             const profit = sellingPrice - cost;
 
             // Append the daily data to the list
             dailyData.push({
                 date: singleDate.toISOString().split('T')[0],
-                day: "test",
+                day: getDayName(singleDate),
                 cost: cost,
                 sellingPrice: sellingPrice,
                 profit: profit,
