@@ -185,7 +185,7 @@ async addHotel(req, res) {
       } else {
         const updatedData = req.body;
         const hotel = await Hotel.findOne({ _id: id });
-  
+        console.log(updatedData)
         if (!hotel) {
           return res
             .status(404)
@@ -289,6 +289,7 @@ async addHotel(req, res) {
         let bookedBeds = 0;
 
         hotel.rooms.forEach((room) => {
+
           const roomTypeCount = room.totalBeds;
           const availableRoomTypeCount = room.beds.filter(
             (bed) => !bed.isBooked
@@ -303,6 +304,7 @@ async addHotel(req, res) {
           }));
 
           roomTypes.push({
+            _id: room._id,
             type: room.roomType,
             roomNumber: room.roomNumber,
             totalBeds: roomTypeCount,
