@@ -1,8 +1,42 @@
 const Hotel = require("../models/hotel");
 const schedule = require("node-schedule");
 const mongoose = require("mongoose");
+const Poform = require("../models/poform");
 
 // Unbook a room
+
+const deleteExpiredBookings = async () => {
+  try {
+    const now = new Date();
+    const expiredPoforms = await Poform.find({ checkout: { $lte: now } });
+
+    for (const poform of expiredPoforms) {
+      const hotel = await Hotel.findById(poform.hotelID);
+      if (hotel) {
+        hotel.rooms = hotel.rooms.filter((room) => {
+          const isRoomFromPoform = room.beds.some(
+            (bed) =>
+              bed.Booking &&
+              bed.Booking.from === poform.checkin &&
+              bed.Booking.to === poform.checkout &&
+              bed.customer.toString() === poform.supplierID.toString()
+          );
+          return !isRoomFromPoform;
+        });
+        console.log("hotel rooms", hotel.rooms);
+
+        // await hotel.save();
+      }
+
+      // Optionally, you can remove the Poform document after processing
+      // await poform.remove();
+    }
+
+    console.log("Expired Poform bookings removed.");
+  } catch (error) {
+    console.error("Error deleting expired bookings:", error);
+  }
+};
 const deleteBooking = async () => {
   try {
     const now = new Date();
@@ -22,14 +56,13 @@ const deleteBooking = async () => {
 // Schedule the job to run daily at midnight
 schedule.scheduleJob("0 0 * * *", deleteBooking);
 
-
 const getAvailableRoomsCount = (hotel) => {
   let availableRoomsCount = 0;
   hotel.rooms.forEach((room) => {
-      const isRoomAvailable = room.beds.some((bed) => !bed.isBooked);
-      if (isRoomAvailable) {
-          availableRoomsCount++;
-      }
+    const isRoomAvailable = room.beds.some((bed) => !bed.isBooked);
+    if (isRoomAvailable) {
+      availableRoomsCount++;
+    }
   });
   return availableRoomsCount;
 };
@@ -37,147 +70,140 @@ const getAvailableRoomsCount = (hotel) => {
 const getBookedRoomsCount = (hotel) => {
   let bookedRoomsCount = 0;
   hotel.rooms.forEach((room) => {
-      const isRoomBooked = room.beds.every((bed) => bed.isBooked);
-      if (isRoomBooked) {
-          bookedRoomsCount++;
-      }
+    const isRoomBooked = room.beds.every((bed) => bed.isBooked);
+    if (isRoomBooked) {
+      bookedRoomsCount++;
+    }
   });
   return bookedRoomsCount;
 };
 
-
 const hotelController = {
-
-
- 
-
-async getSingleHotel(req, res) {
+  async getSingleHotel(req, res) {
     try {
-        const hotelId = req.params.id;
-        const hotel = await Hotel.findById(hotelId);
+      const hotelId = req.params.id;
+      const hotel = await Hotel.findById(hotelId);
 
-        if (!hotel) {
-            return res.status(404).send({
-                success: false,
-                data: { error: "Hotel not found" },
-            });
-        }
-
-        const image = hotel.image || null;
-
-        const availableRoomsCount = getAvailableRoomsCount(hotel);
-        const bookedRoomsCount = getBookedRoomsCount(hotel);
-
-        return res.status(200).send({
-            success: true,
-            data: {
-                message: "Hotel details found",
-                hotel: {
-                    ...hotel.toObject(),
-                    image: image,
-                    availableRoomsCount: availableRoomsCount,
-                    bookedRoomsCount: bookedRoomsCount,
-                },
-            },
+      if (!hotel) {
+        return res.status(404).send({
+          success: false,
+          data: { error: "Hotel not found" },
         });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).send({
-            success: false,
-            data: { error: "Server Error" },
-        });
-    }
-},
-
-  
-  
-async addHotel(req, res) {
-  try {
-    console.log("in add hotel", req.body);
-
-    const fileBuffer = req.file ? req.file.filename : null;
-    let hotelData = req.body;
-
-    if (fileBuffer != null) {
-      hotelData.image = fileBuffer;
-    }
-    const hotelExists = await Hotel.findOne({
-      name: hotelData.name,
-      location: hotelData.location,
-    });
-
-    if (hotelExists) {
-      return res.status(400).send({
-        success: false,
-        data: { error: "This hotel already exists" },
-      });
-    } else {
-      if (typeof hotelData.rooms === "string") {
-        hotelData.rooms = JSON.parse(hotelData.rooms);
       }
 
-      let roomNumberCounter = 0;   
-      let processedRooms = hotelData.rooms.map(room => {
-        roomNumberCounter++; 
+      const image = hotel.image || null;
 
-        // Create beds array based on the number of beds
-        let beds = Array.from({ length: room.totalBeds }, (_, index) => ({
-          bedNumber: index + 1,
-          isBooked: room.beds && room.beds[index] ? room.beds[index].isBooked : false,
-          bedRate: room.beds && room.beds[index] ? room.beds[index].bedRate : 0, 
-        }));
+      const availableRoomsCount = getAvailableRoomsCount(hotel);
+      const bookedRoomsCount = getBookedRoomsCount(hotel);
 
-        return {
-          ...room,
-          roomNumber: roomNumberCounter.toString(),
-          beds: beds,
-        };
-      });
-
-    
-      let hotel = new Hotel({
-        name: hotelData.name,
-        image: hotelData.image,
-        location: hotelData.location,
-        totalRooms: hotelData.totalRooms,
-        rooms: processedRooms,
-      });
-
-      try {
-        const registeredHotel = await hotel.save();
-        console.log("hotel", registeredHotel);
-        return res.status(200).send({
-          success: true,
-          data: {
-            message: "Hotel added successfully",
-            hotel: registeredHotel,
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Hotel details found",
+          hotel: {
+            ...hotel.toObject(),
+            image: image,
+            availableRoomsCount: availableRoomsCount,
+            bookedRoomsCount: bookedRoomsCount,
           },
-        });
-      } catch (error) {
-        console.log(error);
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+
+  async addHotel(req, res) {
+    try {
+      deleteExpiredBookings();
+      console.log("in add hotel", req.body);
+
+      const fileBuffer = req.file ? req.file.filename : null;
+      let hotelData = req.body;
+
+      if (fileBuffer != null) {
+        hotelData.image = fileBuffer;
+      }
+      const hotelExists = await Hotel.findOne({
+        name: hotelData.name,
+        location: hotelData.location,
+      });
+
+      if (hotelExists) {
         return res.status(400).send({
           success: false,
-          data: { error: error.message },
+          data: { error: "This hotel already exists" },
         });
+      } else {
+        if (typeof hotelData.rooms === "string") {
+          hotelData.rooms = JSON.parse(hotelData.rooms);
+        }
+
+        let roomNumberCounter = 0;
+        let processedRooms = hotelData.rooms.map((room) => {
+          roomNumberCounter++;
+
+          // Create beds array based on the number of beds
+          let beds = Array.from({ length: room.totalBeds }, (_, index) => ({
+            bedNumber: index + 1,
+            isBooked:
+              room.beds && room.beds[index] ? room.beds[index].isBooked : false,
+            bedRate:
+              room.beds && room.beds[index] ? room.beds[index].bedRate : 0,
+          }));
+
+          return {
+            ...room,
+            roomNumber: roomNumberCounter.toString(),
+            beds: beds,
+          };
+        });
+
+        let hotel = new Hotel({
+          name: hotelData.name,
+          image: hotelData.image,
+          location: hotelData.location,
+          totalRooms: hotelData.totalRooms,
+          rooms: processedRooms,
+        });
+
+        try {
+          const registeredHotel = await hotel.save();
+          console.log("hotel", registeredHotel);
+          return res.status(200).send({
+            success: true,
+            data: {
+              message: "Hotel added successfully",
+              hotel: registeredHotel,
+            },
+          });
+        } catch (error) {
+          console.log(error);
+          return res.status(400).send({
+            success: false,
+            data: { error: error.message },
+          });
+        }
       }
+    } catch (err) {
+      console.log("error", err);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Some Error Occurred" },
+      });
     }
-  } catch (err) {
-    console.log("error", err);
-    return res.status(500).send({
-      success: false,
-      data: { error: "Some Error Occurred" },
-    });
-  }
-}
+  },
 
-
-,
   // edit hotel
 
   async editHotel(req, res) {
     try {
       const id = req.params.id;
-  
+
       if (!id) {
         return res
           .status(400)
@@ -185,21 +211,20 @@ async addHotel(req, res) {
       } else {
         const updatedData = req.body;
         const hotel = await Hotel.findOne({ _id: id });
-        console.log(updatedData)
+        console.log(updatedData);
         if (!hotel) {
           return res
             .status(404)
             .send({ success: false, data: { error: "Hotel not found" } });
         }
-  
-        
+
         let roomNumberCounter = hotel.rooms.length;
-  
+
         const newRooms = updatedData.roomDetails.reduce((acc, roomDetail) => {
           const numRooms = parseInt(roomDetail.rooms);
           for (let i = 1; i <= numRooms; i++) {
-            roomNumberCounter++; 
-  
+            roomNumberCounter++;
+
             const beds = [];
             for (let j = 1; j <= roomDetail.beds; j++) {
               beds.push({
@@ -216,7 +241,7 @@ async addHotel(req, res) {
           }
           return acc;
         }, []);
-  
+
         const updatedRoomArray = [...hotel.rooms, ...newRooms];
         const updatedObject = {
           location: updatedData.location,
@@ -224,14 +249,21 @@ async addHotel(req, res) {
           totalRooms: updatedRoomArray.length,
           rooms: updatedRoomArray,
         };
-  
-        const updatedHotel = await Hotel.findOneAndUpdate({ _id: id }, updatedObject, {
-          new: true,
-        });
-  
+
+        const updatedHotel = await Hotel.findOneAndUpdate(
+          { _id: id },
+          updatedObject,
+          {
+            new: true,
+          }
+        );
+
         return res.status(200).send({
           success: true,
-          data: { message: "Details updated successfully", hotel: updatedHotel },
+          data: {
+            message: "Details updated successfully",
+            hotel: updatedHotel,
+          },
         });
       }
     } catch (error) {
@@ -241,29 +273,28 @@ async addHotel(req, res) {
         data: { error: "Server Error" },
       });
     }
-  }
-  ,
+  },
   async updateHotel(req, res) {
     try {
       const id = req.params.id;
       const updatedData = req.body;
-  
+
       if (!id) {
         return res
           .status(400)
           .send({ success: false, data: { error: "Hotel ID is required" } });
       }
-  
+
       const hotel = await Hotel.findOneAndUpdate({ _id: id }, updatedData, {
         new: true,
       });
-  
+
       if (!hotel) {
         return res
           .status(404)
           .send({ success: false, data: { error: "Hotel not found" } });
       }
-  
+
       return res.status(200).send({
         success: true,
         data: { message: "Details updated successfully", hotel: hotel },
@@ -276,7 +307,6 @@ async addHotel(req, res) {
       });
     }
   },
-  
 
   // get all hotels
   async getHotels(req, res) {
@@ -289,7 +319,6 @@ async addHotel(req, res) {
         let bookedBeds = 0;
 
         hotel.rooms.forEach((room) => {
-
           const roomTypeCount = room.totalBeds;
           const availableRoomTypeCount = room.beds.filter(
             (bed) => !bed.isBooked
@@ -418,29 +447,32 @@ async addHotel(req, res) {
     try {
       const { name } = req.params;
 
-      
       const pipeline = [
         { $unwind: "$rooms" },
-        { $unwind: "$rooms.beds"},
+        { $unwind: "$rooms.beds" },
         { $match: { "rooms.beds.isBooked": true } },
         {
           $lookup: {
-            from: 'users',
-            localField: 'rooms.beds.customer',
-            foreignField: '_id',
-            as: 'rooms.beds.customerDetails'
-          }
+            from: "users",
+            localField: "rooms.beds.customer",
+            foreignField: "_id",
+            as: "rooms.beds.customerDetails",
+          },
         },
         {
           $unwind: {
-            path: '$rooms.beds.customerDetails',
+            path: "$rooms.beds.customerDetails",
             preserveNullAndEmptyArrays: true,
           },
         },
         {
           $addFields: {
             hotelOrCustomerName: {
-              $concat: ['$name', ' ', { $ifNull: ['$rooms.beds.customerDetails.name', ''] }],
+              $concat: [
+                "$name",
+                " ",
+                { $ifNull: ["$rooms.beds.customerDetails.name", ""] },
+              ],
             },
           },
         },
@@ -506,19 +538,19 @@ async addHotel(req, res) {
     try {
       const bookedRooms = await Hotel.aggregate([
         { $unwind: "$rooms" },
-        { $unwind: "$rooms.beds"},
+        { $unwind: "$rooms.beds" },
         { $match: { "rooms.beds.isBooked": true } },
         {
           $lookup: {
-            from: 'users',
-            localField: 'rooms.beds.customer',
-            foreignField: '_id',
-            as: 'rooms.beds.customerDetails'
-          }
+            from: "users",
+            localField: "rooms.beds.customer",
+            foreignField: "_id",
+            as: "rooms.beds.customerDetails",
+          },
         },
         {
           $unwind: {
-            path: '$rooms.beds.customerDetails',
+            path: "$rooms.beds.customerDetails",
             preserveNullAndEmptyArrays: true,
           },
         },
@@ -578,20 +610,20 @@ async addHotel(req, res) {
   async searchHotel(req, res) {
     try {
       const value = req.params.value;
-  
+
       const hotels = await Hotel.find({
         $or: [
           { name: new RegExp(value, "i") },
           { location: new RegExp(value, "i") },
         ],
       });
-  
+
       if (hotels.length > 0) {
         const hotelList = hotels.map((hotel) => {
           let roomTypes = [];
           let booked = 0;
           let available = 0;
-  
+
           hotel.rooms.forEach((room) => {
             room.beds.forEach((bed) => {
               if (bed.isBooked) {
@@ -600,14 +632,16 @@ async addHotel(req, res) {
                 available++;
               }
             });
-            let existingType = roomTypes.find((type) => type.type === room.roomType);
+            let existingType = roomTypes.find(
+              (type) => type.type === room.roomType
+            );
             if (existingType) {
               existingType.number++;
             } else {
               roomTypes.push({ type: room.roomType, number: 1 });
             }
           });
-  
+
           return {
             id: hotel._id,
             name: hotel.name,
@@ -619,7 +653,7 @@ async addHotel(req, res) {
             booked,
           };
         });
-  
+
         return res.status(200).send({
           success: true,
           data: { message: "Hotels found", hotels: hotelList },
@@ -638,7 +672,6 @@ async addHotel(req, res) {
       });
     }
   },
-  
 
   // get unbooked rooms
   async getunBookedBeds(req, res) {
