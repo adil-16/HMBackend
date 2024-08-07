@@ -30,6 +30,11 @@ const roomServices = {
 
         let newCost = cost;
 
+        let totalCost = cost*dates.length;
+        let totalSale = 0;
+        let totalProfit = 0;
+        let vacantDays = 0;
+        let bookedDays = 0;
         for(let i =0; i<dates.length; i++){
             let singleDate = dates[i];
 
@@ -42,12 +47,14 @@ const roomServices = {
                     sellingPrice += customer.roomRate;
                 }
             });
-
+            totalSale+=sellingPrice;
             if(sellingPrice == 0){
+                vacantDays+=1;
                 newCost += (newCost / (dates.length -(i+1)))
             }
             else
             {
+                bookedDays+=1;
                 if(newCost != cost){
                     for(let i = dailyData.length - 1; i>=0 && dailyData[i].booking != "Booked"; i--){
                         dailyData[i].cost = 0;
@@ -78,8 +85,16 @@ const roomServices = {
             //     (sellingPrice == 0)? "Vacant":"Booked" //Booking Status
             // ]);
         }
+        totalProfit = totalSale - totalCost;
 
-        return dailyData;
+        return {
+            totalCost,
+            totalSale,
+            totalProfit,
+            vacantDays,
+            bookedDays,
+            roomLedger: dailyData
+        };
     },
     async getRoomLedger(hotelId, roomId){
         //Find Hotel

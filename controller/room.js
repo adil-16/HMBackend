@@ -6,9 +6,9 @@ const roomController = {
         let hotelId = req.params.hotelId;
         let roomId = req.params.roomId
 
-        let roomLedger = await roomServices.getRoomLedger(hotelId, roomId)
+        let roomData = await roomServices.getRoomLedger(hotelId, roomId)
 
-        return res.status(200).send({roomLedger})
+        return res.status(200).send({...roomData})
     }
 }
 
