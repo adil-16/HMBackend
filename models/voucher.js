@@ -30,11 +30,15 @@ const accommodationSchema = new mongoose.Schema({
   roomType: { type: String, required: true },
   checkin: { type: Date, required: true },
   checkout: { type: Date, required: true },
-  roomRate: {
+  bedRate: {
     type: Number,
     required: true,
   },
-  totalRooms: {
+  bookingType:{
+    type: String,
+    enum: ['bed', 'room'] 
+  },
+  noOfBeds: {
     type: Number,
     required: true,
   },

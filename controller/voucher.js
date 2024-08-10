@@ -2,39 +2,89 @@ const Hotel = require("../models/hotel");
 const User = require("../models/user");
 const Voucher = require("../models/voucher");
 const Ledger = require("../models/ledger");
+const voucherServices = require("../services/voucher");
+
+
+function getAvailableBeds(hotelObj, accommodation){
+  let availableRooms = []
+  // Filter rooms based on accommodation's room type and date range even if only 1 bed is available
+  for(let i = 0; i<hotelObj.rooms.length; i++){
+      let room = hotelObj.rooms[i];
+
+      if(room.roomType !== accommodation.roomType){
+          continue; 
+      }
+
+      // Check if accommodation's dates fall within room's checkin and checkout dates
+      if (
+          accommodation.checkin < room.checkinDate ||
+          accommodation.checkout > room.checkoutDate
+      ) {
+          return false;
+      }
+
+      //Check collision with customers booking
+      let availableBeds = room.totalBeds;
+      for(let i = 0; i<room.customersData.length && availableBeds>0; i++){
+          let customer = room.customersData[i];
+          if((accommodation.checkin.getTime() == customer.checkoutDate.getTime()) || // Covering Edge Case
+          (accommodation.checkout.getTime() == customer.checkinDate.getTime()) ||
+          (accommodation.checkin >= customer.checkinDate && accommodation.checkin < customer.checkoutDate) ||
+          (accommodation.checkout > customer.checkinDate && accommodation.checkout <= customer.checkoutDate) ||
+          (accommodation.checkin <= customer.checkinDate && accommodation.checkout >= customer.checkoutDate))
+          {
+              availableBeds-=customer.noOfBeds;
+          }
+      }
+
+      //if beds are greater than 0 then add field for the availableBeds in room and add room in availableRooms.
+      if(availableBeds == room.totalBeds){
+          room.availableBeds = availableBeds;
+          availableRooms.push(room)
+      }
+      else if(availableBeds > 0){
+          room.availableBeds = availableBeds;
+          availableRooms.unshift(room)
+      }
+  }
+
+// Return the number of available rooms
+return availableRooms;
+}
 
 function getAvailableRooms(hotelRecord, accommodation) {
-  // Filter rooms based on accommodation's room type and date range
-  const availableRooms = hotelRecord.rooms.filter((room) => {
-    // Check if the room type matches
-    if (room.roomType !== accommodation.roomType) {
-      return false;
-    }
+// Filter rooms based on accommodation's room type and date range
+const availableRooms = hotelRecord.rooms.filter((room) => {
+  // Check if the room type matches
+  if (room.roomType !== accommodation.roomType) {
+    return false;
+  }
+  room.availableBeds = room.totalBeds;
+  // Check if accommodation's dates fall within room's checkin and checkout dates
+  if (
+    accommodation.checkin < room.checkinDate ||
+    accommodation.checkout > room.checkoutDate
+  ) {
+    return false;
+  }
 
-    // Check if accommodation's dates fall within room's checkin and checkout dates
-    if (
-      accommodation.checkin < room.checkinDate ||
-      accommodation.checkout > room.checkoutDate
-    ) {
-      return false;
-    }
-
-    // Check if accommodation's dates intersect with any of the customer's data dates
-    const isIntersectingWithCustomerData = room.customersData.some((customer) => {
-      return (
-        (accommodation.checkin.getTime() == customer.checkoutDate.getTime()) || // Covering Edge Case
-        (accommodation.checkin >= customer.checkinDate && accommodation.checkin < customer.checkoutDate) ||
-        (accommodation.checkout > customer.checkinDate && accommodation.checkout <= customer.checkoutDate) ||
-        (accommodation.checkin <= customer.checkinDate && accommodation.checkout >= customer.checkoutDate)
-      );
-    });
-
-    // If there's an intersection with customer data, the room is not available
-    return !isIntersectingWithCustomerData;
+  // Check if accommodation's dates intersect with any of the customer's data dates
+  const isIntersectingWithCustomerData = room.customersData.some((customer) => {
+    return (
+      (accommodation.checkin.getTime() == customer.checkoutDate.getTime()) || // Covering Edge Case
+      (accommodation.checkout.getTime() == customer.checkinDate.getTime()) || // Covering Edge Case
+      (accommodation.checkin >= customer.checkinDate && accommodation.checkin < customer.checkoutDate) ||
+      (accommodation.checkout > customer.checkinDate && accommodation.checkout <= customer.checkoutDate) ||
+      (accommodation.checkin <= customer.checkinDate && accommodation.checkout >= customer.checkoutDate)
+    );
   });
 
-  // Return the number of available rooms
-  return availableRooms;
+  // If there's an intersection with customer data, the room is not available
+  return !isIntersectingWithCustomerData;
+});
+
+// Return the number of available rooms
+return availableRooms;
 }
 
 const voucherController = {
@@ -86,51 +136,59 @@ const voucherController = {
         // Calculate the total amount based on customerType
         const nights = Math.ceil(
           (new Date(accommodation.checkout) - new Date(accommodation.checkin)) /
-            (1000 * 60 * 60 * 24)
+            (1000 * 60 * 60 * 24) + 1
         );
         if (customerRecord) {
-          if (!accommodation.roomRate) {
+          if (!accommodation.bedRate) {
             return res.status(400).send({
               success: false,
-              data: { error: "Room rate is required for b2b customers" },
+              data: { error: "Bed rate is required for b2b customers" },
             });
           }
-          if (!accommodation.totalRooms) {
+          if (!accommodation.noOfBeds) {
             return res.status(400).send({
               success: false,
-              data: { error: "Total rooms is required for b2b customers" },
+              data: { error: "No of Beds is required for b2b customers" },
             });
           }
-          amount = accommodation.roomRate * accommodation.totalRooms * nights;
         } else {
-          if (!accommodation.roomRate) {
+          if (!accommodation.bedRate) {
             return res.status(400).send({
               success: false,
-              data: { error: "Room rate is required for non-shared rooms" },
+              data: { error: "Bed rate is required for non-shared rooms" },
             });
           }
-          if (!accommodation.totalRooms) {
+          if (!accommodation.noOfBeds) {
             return res.status(400).send({
               success: false,
-              data: { error: "Total rooms is required for non-shared rooms" },
+              data: { error: "No of Beds is required for non-shared rooms" },
             });
           }
-          amount = accommodation.roomRate * accommodation.totalRooms * nights;
         }
+
+        amount = accommodation.bedRate * accommodation.noOfBeds * nights;
 
         totalAmount += amount;
 
+        let availableRooms = []
         //Also Checking if room is booked or not for that date.
-        let availableRooms = getAvailableRooms(hotelRecord, accommodation)
-
-        if (accommodation.totalRooms > availableRooms.length) {
-          return res.status(400).send({
-            success: false,
-            data: {
-              error: `Not enough ${accommodation.roomType} rooms available`,
-            },
-          });
+        if(accommodation.bookingType == "bed"){
+          availableRooms =  getAvailableBeds(hotelRecord, accommodation)
         }
+        else{
+          
+          availableRooms = getAvailableRooms(hotelRecord, accommodation)
+        }
+
+        // As per new ammendment we must proceed with the booking even if rooms are not enough
+        // if (accommodation.totalRooms > availableRooms.length) {
+        //   return res.status(400).send({
+        //     success: false,
+        //     data: {
+        //       error: `Not enough ${accommodation.roomType} rooms available`,
+        //     },
+        //   });
+        // }
 
          accommodation.rooms = availableRooms;
          accommodation.hotelRecord = hotelRecord;
@@ -152,35 +210,44 @@ const voucherController = {
       for(let accommodation of accommodations){
         let hotelRecord = await Hotel.findById(accommodation.hotel);
         let roomsAdded = [];
-        for(let i = 0; i<accommodation.totalRooms; i++){
-            console.log(accommodation.rooms[i])
-            let room = accommodation.rooms[i];
-            if (!room.beds.some((bed) => bed.isBooked)) {
-              room.beds.forEach((bed) => {
-                bed.isBooked = true;
-                bed.Booking = {
-                  from: accommodation.checkin,
-                  to: accommodation.checkout,
-                };
-                bed.customer = customer;
-              });
-            }
-            room.customersData.push({
+        let totalNumberOfBeds = accommodation.noOfBeds;
+        for(let i = 0; i<accommodation.rooms.length && totalNumberOfBeds > 0; i++){
+          let room = accommodation.rooms[i];
+          let bedsToBeBooked = room.availableBeds
+          if(room.availableBeds>totalNumberOfBeds){
+            bedsToBeBooked = totalNumberOfBeds
+          }
+          room.customersData.push({
               voucherId: voucher._id,
               checkinDate: accommodation.checkin,
               checkoutDate: accommodation.checkout,
-              roomRate: accommodation.roomRate
-            })
-            roomsAdded.push(room);
-            console.log(roomsAdded);
-            
-          }
+              bedRate: accommodation.bedRate,
+              bookingType: accommodation.bookingType,
+              noOfBeds: bedsToBeBooked
+          })
+          roomsAdded.push(room);
+          totalNumberOfBeds-=bedsToBeBooked;
+        }
+        //Save the rooms which were changed during this process//
         hotelRecord.rooms = hotelRecord.rooms.map((room)=>{
           let newRoom = roomsAdded.find(newlyAddedRoom => room._id.equals(newlyAddedRoom._id));
           if(!newRoom)
             return room;
           return newRoom;
-        }) 
+        })
+        // If there are some remaining beds then save them in hotelRecord//
+        if(totalNumberOfBeds > 0){
+          hotelRecord.remainingCustomerData.push(
+            {
+              voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
+              checkinDate: accommodation.checkin,
+              checkoutDate: accommodation.checkout,
+              bookingType: accommodation.bookingType,
+              noOfBeds: accommodation.noOfBeds,
+              roomType: accommodation.roomType
+            }
+          )
+        }
         await hotelRecord.save();
       }
       

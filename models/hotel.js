@@ -2,36 +2,6 @@ const mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 
-const bedSchema = new Schema({
-  bedNumber: {
-    type: Number,
-    required: true,
-  },
-  bedRate: {
-    type: Number,
-    required: true,
-  },
-  
-  // bedType: {
-  //   type: String,
-  //   required:true
-  // },
-
-  isBooked: { type: Boolean, default: false },
-  Booking: {
-    from: {
-      type: Date,
-    },
-    to: {
-      type: Date,
-    },
-  },
-  customer: {
-    type: mongoose.Schema.ObjectId,
-    ref: "user",
-  },
-});
-
 const roomSchema = new Schema({
   roomType: {
     type: String,
@@ -54,11 +24,11 @@ const roomSchema = new Schema({
         voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
         checkinDate: Date,
         checkoutDate: Date,
-        roomRate: Number
+        noOfBeds: Number,
+        bedRate: Number
       }
     ]
-  },
-  beds: [bedSchema]
+  }
 });
 
 const hotelSchema = new Schema({
@@ -78,5 +48,15 @@ const hotelSchema = new Schema({
     required: true,
   },
   rooms: [roomSchema],
+  remainingCustomerData: [
+    {
+      voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
+      checkinDate: Date,
+      checkoutDate: Date,
+      bookingType: String,
+      noOfBeds: Number,
+      roomType: String
+    }
+  ]
 });
 module.exports = mongoose.model("hotel", hotelSchema, "hotels");
