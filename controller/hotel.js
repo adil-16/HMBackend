@@ -2,6 +2,8 @@ const Hotel = require("../models/hotel");
 const schedule = require("node-schedule");
 const mongoose = require("mongoose");
 const Poform = require("../models/poform");
+const { getWastageCollection, getInventoryInfo } = require("../services/hotel");
+const hotelServices = require("../services/hotel");
 
 // Unbook a room
 
@@ -79,7 +81,80 @@ const getBookedRoomsCount = (hotel) => {
 };
 
 const hotelController = {
-  async getSingleHotel(req, res) {
+  async getInventoryInfo(req, res){
+    try {
+      let date = new Date (req.query.date);
+      let inventoryInfo = await getInventoryInfo(date);
+
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Inventory Report has been Generated",
+          inventoryInfo
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+  async getWastageCollection(req, res){
+    try {
+      let date = new Date (req.query.date);
+      let wastageCollection = await getWastageCollection(date);
+
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Wastage Collection Report Generated",
+          wastageCollection
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+  async getHotelDetails(req, res){
+    try {
+      const hotelId = req.params.id;
+
+      let hotel = await hotelServices.getHotelDetails(hotelId);
+
+      if (!hotel) {
+        return res.status(404).send({
+          success: false,
+          data: { error: "Hotel not found" },
+        });
+      }
+      console.log(hotel);
+      const image = hotel.image || null;
+
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Hotel details found",
+          hotel: {
+            ...hotel,
+            image: image
+          },
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+  async getSingleHotel(req, res){
     try {
       const hotelId = req.params.id;
       const hotel = await Hotel.findById(hotelId);
@@ -93,18 +168,13 @@ const hotelController = {
 
       const image = hotel.image || null;
 
-      const availableRoomsCount = getAvailableRoomsCount(hotel);
-      const bookedRoomsCount = getBookedRoomsCount(hotel);
-
       return res.status(200).send({
         success: true,
         data: {
           message: "Hotel details found",
           hotel: {
             ...hotel.toObject(),
-            image: image,
-            availableRoomsCount: availableRoomsCount,
-            bookedRoomsCount: bookedRoomsCount,
+            image: image
           },
         },
       });
@@ -143,32 +213,11 @@ const hotelController = {
           hotelData.rooms = JSON.parse(hotelData.rooms);
         }
 
-        let roomNumberCounter = 0;
-        let processedRooms = hotelData.rooms.map((room) => {
-          roomNumberCounter++;
-
-          // Create beds array based on the number of beds
-          let beds = Array.from({ length: room.totalBeds }, (_, index) => ({
-            bedNumber: index + 1,
-            isBooked:
-              room.beds && room.beds[index] ? room.beds[index].isBooked : false,
-            bedRate:
-              room.beds && room.beds[index] ? room.beds[index].bedRate : 0,
-          }));
-
-          return {
-            ...room,
-            roomNumber: roomNumberCounter.toString(),
-            beds: beds,
-          };
-        });
-
         let hotel = new Hotel({
           name: hotelData.name,
+          totalRooms: 0,
           image: hotelData.image,
-          location: hotelData.location,
-          totalRooms: hotelData.totalRooms,
-          rooms: processedRooms,
+          location: hotelData.location
         });
 
         try {
@@ -315,29 +364,15 @@ const hotelController = {
 
       const hotelList = hotels.map((hotel) => {
         let roomTypes = [];
-        let availableBeds = 0;
-        let bookedBeds = 0;
 
         hotel.rooms.forEach((room) => {
           const roomTypeCount = room.totalBeds;
-          const availableRoomTypeCount = room.beds.filter(
-            (bed) => !bed.isBooked
-          ).length;
-
-          availableBeds += availableRoomTypeCount;
-          bookedBeds += roomTypeCount - availableRoomTypeCount;
-
-          const beds = room.beds.map((bed) => ({
-            bedNumber: bed.bedNumber,
-            isBooked: bed.isBooked,
-          }));
 
           roomTypes.push({
             _id: room._id,
             type: room.roomType,
             roomNumber: room.roomNumber,
-            totalBeds: roomTypeCount,
-            beds: beds,
+            totalBeds: roomTypeCount
           });
         });
 
@@ -348,9 +383,7 @@ const hotelController = {
           totalRooms: hotel.totalRooms,
           totalBeds: hotel.rooms.reduce((sum, room) => sum + room.totalBeds, 0),
           rooms: roomTypes,
-          image: hotel.image,
-          availableBeds,
-          bookedBeds,
+          image: hotel.image
         };
       });
 
@@ -362,6 +395,7 @@ const hotelController = {
         },
       });
     } catch (error) {
+      console.log(error);
       res.status(500).json({
         success: false,
         data: { error: "Server Error" },

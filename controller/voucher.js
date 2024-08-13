@@ -4,6 +4,12 @@ const Voucher = require("../models/voucher");
 const Ledger = require("../models/ledger");
 const voucherServices = require("../services/voucher");
 
+const roomBedNumbers = {
+  "Quint": 5,
+  "Quad": 4,
+  "Triple": 3,
+  "Double": 2
+}
 
 function getAvailableBeds(hotelObj, accommodation){
   let availableRooms = []
@@ -122,6 +128,18 @@ const voucherController = {
 
       // Validate accommodations and their hotels
       let totalAmount = 0;
+      // Create voucher
+      const voucher = new Voucher({
+        voucherNumber,
+        customer,
+        confirmationStatus,
+        tentativeHours:
+          confirmationStatus === "Tentative" ? tentativeHours : null,
+        vatnumber,
+        accommodations,
+        passengers,
+      });
+
       for (let accommodation of accommodations) {
         accommodation.checkin = new Date(accommodation.checkin)
         accommodation.checkout = new Date(accommodation.checkout)
@@ -138,6 +156,12 @@ const voucherController = {
           (new Date(accommodation.checkout) - new Date(accommodation.checkin)) /
             (1000 * 60 * 60 * 24) + 1
         );
+        
+        if(accommodation.roomRate){
+          accommodation.bedRate = accommodation.roomRate/roomBedNumbers[accommodation.roomType];
+          accommodation.noOfBeds = accommodation.totalRooms*roomBedNumbers[accommodation.roomType];
+        }
+
         if (customerRecord) {
           if (!accommodation.bedRate) {
             return res.status(400).send({
@@ -190,27 +214,11 @@ const voucherController = {
         //   });
         // }
 
-         accommodation.rooms = availableRooms;
-         accommodation.hotelRecord = hotelRecord;
-      }
+        accommodation.rooms = availableRooms;
 
-      // Create voucher
-      const voucher = new Voucher({
-        voucherNumber,
-        customer,
-        confirmationStatus,
-        tentativeHours:
-          confirmationStatus === "Tentative" ? tentativeHours : null,
-        vatnumber,
-        accommodations,
-        passengers,
-      });
-
-
-      for(let accommodation of accommodations){
-        let hotelRecord = await Hotel.findById(accommodation.hotel);
         let roomsAdded = [];
         let totalNumberOfBeds = accommodation.noOfBeds;
+        console.log("Number of Beds", totalNumberOfBeds)
         for(let i = 0; i<accommodation.rooms.length && totalNumberOfBeds > 0; i++){
           let room = accommodation.rooms[i];
           let bedsToBeBooked = room.availableBeds
@@ -239,18 +247,18 @@ const voucherController = {
         if(totalNumberOfBeds > 0){
           hotelRecord.remainingCustomerData.push(
             {
-              voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
+              voucherId: voucher._id,
               checkinDate: accommodation.checkin,
               checkoutDate: accommodation.checkout,
               bookingType: accommodation.bookingType,
-              noOfBeds: accommodation.noOfBeds,
+              noOfBeds: totalNumberOfBeds,
               roomType: accommodation.roomType
             }
           )
         }
         await hotelRecord.save();
       }
-      
+      voucher.accommodations = accommodations;
       const savedVoucher = await voucher.save();
 
       // Update ledger based on payment method

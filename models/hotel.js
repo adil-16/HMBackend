@@ -15,7 +15,10 @@ const roomSchema = new Schema({
     type: Number,
     required: true,
   },
-  bedRate: Number,
+  bedRate: {
+    type: Number,
+    required: true
+  },
   checkinDate: Date,
   checkoutDate: Date,
   customersData: {

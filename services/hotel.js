@@ -1,4 +1,5 @@
 const Hotel = require("../models/hotel");
+const roomServices = require("./room");
 
 function getAvailableBeds(rooms, remainingCustomerData){
   let availableRooms = []
@@ -6,14 +7,14 @@ function getAvailableBeds(rooms, remainingCustomerData){
   for(let i = 0; i<rooms.length; i++){
       let room = rooms[i];
 
-      if(room.roomType !== accommodation.roomType){
+      if(room.roomType !== remainingCustomerData.roomType){
           continue; 
       }
 
       // Check if accommodation's dates fall within room's checkin and checkout dates
       if (
-          accommodation.checkin < room.checkinDate ||
-          accommodation.checkout > room.checkoutDate
+        remainingCustomerData.checkinDate < room.checkinDate ||
+        remainingCustomerData.checkoutDate > room.checkoutDate
       ) {
           return false;
       }
@@ -51,7 +52,7 @@ function getAvailableRooms(rooms, remainingCustomerData) {
 // Filter rooms based on accommodation's room type and date range
 const availableRooms = rooms.filter((room) => {
   // Check if the room type matches
-  if (room.roomType !== accommodation.roomType) {
+  if (room.roomType !== remainingCustomerData.roomType) {
     return false;
   }
   // Check if accommodation's dates intersect with any of the customer's data dates
@@ -85,7 +86,6 @@ const hotelServices = {
     async addHotelRooms(hotelId, roomDetails, checkin, checkout){
         const hotel = await Hotel.findOne({ _id: hotelId });
         let roomNumberCounter = hotel.rooms.length;
-
         const newRooms = roomDetails.reduce((acc, roomDetail) => {
             const numRooms = parseInt(roomDetail.rooms);
             for (let i = 1; i <= numRooms; i++) {
@@ -96,7 +96,8 @@ const hotelServices = {
                 roomType: roomDetail.type,
                 roomNumber: roomNumberCounter.toString(),
                 totalBeds: roomDetail.beds,
-                bedRate: roomDetails.bedRate
+                bedRate: roomDetail.rate,
+                customersData:[]
               });
             }
             return acc;
@@ -126,7 +127,7 @@ const hotelServices = {
               bedsToBeBooked = remainingBeds
             }
             room.customersData.push({
-              voucherId: voucher._id,
+              voucherId: remainingCustomerData.voucherId,
               checkinDate: remainingCustomerData.checkinDate,
               checkoutDate: remainingCustomerData.checkoutDate,
               bedRate: remainingCustomerData.bedRate,
@@ -137,14 +138,18 @@ const hotelServices = {
           }
 
           //if a remainingCustomerData Order is fullfilled then delete it from hotel//
-          if(remainingBeds == 0){
+          if(remainingBeds <= 0){
             hotel.remainingCustomerData.splice(i--, 1);
+          }
+          else{
+            hotel.remainingCustomerData[i].noOfBeds = remainingBeds
           }
         }
         const updatedRoomArray = [...hotel.rooms, ...newRooms];
         const updatedObject = {
             totalRooms: updatedRoomArray.length,
             rooms: updatedRoomArray,
+            remainingCustomerData: hotel.remainingCustomerData
         };
 
         const updatedHotel = await Hotel.findOneAndUpdate({ _id: hotelId }, updatedObject, {
@@ -160,7 +165,149 @@ const hotelServices = {
         })
 
         return newlyAddedRooms;
+    },
+    getWastageCollectionOfSingleHotel(hotel, date){
+      let roomsForCurrentDate = hotel.rooms.filter((room) => {
+        return (room.checkinDate <= date && room.checkoutDate>=date)
+      })
+      
+      let totalBedsAvailable = {
+        "Quint": 0,
+        "Quad": 0,
+        "Triple": 0,
+        "Double": 0,
+        "Total": 0
+      }
+      let totalRoomsAvailable = {
+        "Quint": 0,
+        "Quad": 0,
+        "Triple": 0,
+        "Double": 0,
+        "Total": 0
+      }
+      roomsForCurrentDate.forEach((room)=>{
+        let roomBooked = false;
+        let remainingBeds = room.totalBeds;
+        for(let i = 0; i<room.customersData.length && remainingBeds>0; i++){
+          if(date <= room.customersData[i].checkoutDate && date >= room.customersData[i].checkinDate )
+          {
+            roomBooked=true;
+            remainingBeds-=room.customersData[i].noOfBeds;
+          }
+        }
+        if(!roomBooked)
+          totalRoomsAvailable[room.roomType] = totalRoomsAvailable[room.roomType] + 1
+        totalBedsAvailable[room.roomType]+=remainingBeds
+      })
+      for(let key in totalBedsAvailable){
+        if(key!="Total")//Adding Everything in Total
+        {
+          totalBedsAvailable["Total"]+=totalBedsAvailable[key];
+          totalRoomsAvailable["Total"]+=totalRoomsAvailable[key];
+        }
+      }
+      return {
+        hotelId: hotel._id,
+        totalRoomsForDate: roomsForCurrentDate.length,
+        hotelName: hotel.name,
+        date: date,
+        totalBedsAvailable,
+        totalRoomsAvailable
+      }
+    },
+    async getWastageCollection(date){
+      let hotels = await Hotel.find({});
+      let wastageCollection = hotels.map((hotel)=>{return hotelServices.getWastageCollectionOfSingleHotel(hotel, date)})
+      return wastageCollection
+    },
+    getPendingBookingsOfSingleHotel(hotel, date){
+      let remainingVouchers = hotel.remainingCustomerData.filter((customerData) => {
+        return (customerData.checkinDate <= date && customerData.checkoutDate>=date)
+      })
+      const roomNumbers = {
+        "Quint": 5,
+        "Quad": 4,
+        "Triple": 3,
+        "Double": 2
+      }
+      let pendingBedsBooking = {
+        "Quint": 0,
+        "Quad": 0,
+        "Triple": 0,
+        "Double": 0,
+        "Total": 0
+      }
+      let pendingRoomsBooking = {
+        "Quint": 0,
+        "Quad": 0,
+        "Triple": 0,
+        "Double": 0,
+        "Total": 0
+      }
+      remainingVouchers.forEach((voucher)=>{
+        pendingBedsBooking[voucher.roomType]+=voucher.noOfBeds;
+      })
+      for(let key in pendingBedsBooking){
+        if(key!="Total")//Adding Everything in Total
+        {
+          let noOfRooms = Math.ceil(pendingBedsBooking[key]/roomNumbers[key]);
+          pendingRoomsBooking[key] = noOfRooms;
+          pendingBedsBooking["Total"]+=pendingBedsBooking[key];
+          pendingRoomsBooking["Total"]+=pendingRoomsBooking[key];
+        }
+      }
+      //Adding everything value in total
+      return {
+        hotelId: hotel._id,
+        hotelName: hotel.name,
+        date: date,
+        pendingBedsBooking,
+        pendingRoomsBooking
+      }
+    },
+    async getPendingBookings(date){
+      let hotels = await Hotel.find({});
+      let pendingRoomsBooking = hotels.map((hotel)=>{return hotelServices.getPendingBookingsOfSingleHotel(hotel, date)})
+      return pendingRoomsBooking
+    },
+    async getInventoryInfo(date){
+      let hotels = await Hotel.find({});
+      let inventoryInfo = hotels.map((hotel)=>{
+        let pendingBookings = hotelServices.getPendingBookingsOfSingleHotel(hotel, date);
+        let availableSlots = hotelServices.getWastageCollectionOfSingleHotel(hotel, date);
+        return({
+          hotelId: hotel._id,
+          hotelName: hotel.name,
+          location: hotel.location,
+          date: date,
+          roomsInventory:{
+            "Quint": availableSlots.totalRoomsAvailable["Quint"] - pendingBookings.pendingRoomsBooking["Quint"],
+            "Quad":  availableSlots.totalRoomsAvailable["Quad"] - pendingBookings.pendingRoomsBooking["Quad"],
+            "Triple":  availableSlots.totalRoomsAvailable["Triple"] - pendingBookings.pendingRoomsBooking["Triple"],
+            "Double":  availableSlots.totalRoomsAvailable["Double"] - pendingBookings.pendingRoomsBooking["Double"],
+            "Total":  availableSlots.totalRoomsAvailable["Total"] - pendingBookings.pendingRoomsBooking["Total"]
+          },
+          bedsInventory:{
+            "Quint": availableSlots.totalBedsAvailable["Quint"] - pendingBookings.pendingBedsBooking["Quint"],
+            "Quad":  availableSlots.totalBedsAvailable["Quad"] - pendingBookings.pendingBedsBooking["Quad"],
+            "Triple":  availableSlots.totalBedsAvailable["Triple"] - pendingBookings.pendingBedsBooking["Triple"],
+            "Double":  availableSlots.totalBedsAvailable["Double"] - pendingBookings.pendingBedsBooking["Double"],
+            "Total":  availableSlots.totalBedsAvailable["Total"] - pendingBookings.pendingBedsBooking["Total"]
+          }
+        })
+      })
+      return inventoryInfo;
+    },
+    async getHotelDetails(hotelId){
+      let hotel = await Hotel.findById(hotelId);
+      let plainHotel = hotel.toObject()
+      if(hotel){
+        for(let i = 0; i<plainHotel.rooms.length; i++){
+          plainHotel.rooms[i].availability = roomServices.getAvailability(plainHotel.rooms[i])
+        }
+      }
+      return plainHotel;
     }
-} 
+}
 
 module.exports = hotelServices;

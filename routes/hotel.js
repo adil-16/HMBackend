@@ -19,5 +19,7 @@ hotelRouter.get("/search/:value", hotelController.searchHotel);
 hotelRouter.get("/booking/search/:name", hotelController.searchBookings);
 hotelRouter.delete("/deleteHotel/:id", hotelController.deleteHotel);
 hotelRouter.get("/getHotel/:id", hotelController.getSingleHotel);
-
+hotelRouter.get("/wastageCollection", hotelController.getWastageCollection)
+hotelRouter.get("/inventoryInfo", hotelController.getInventoryInfo);
+hotelRouter.get("/getHotelDetails/:id", hotelController.getHotelDetails)
 module.exports =  hotelRouter;
