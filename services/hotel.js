@@ -48,6 +48,21 @@ function getAvailableBeds(rooms, remainingCustomerData){
   return availableRooms;
 }
 
+function replaceElements(dateRanges, elementIndex, rangesToAdd){
+  let newArray = [];
+  for(let i = 0; i<dateRanges.length; i++){
+      if(i != elementIndex){
+          newArray.push(dateRanges[i])
+      }
+      else{
+          for(let j = 0; j<rangesToAdd.length; j++){
+              newArray.push(rangesToAdd[j])
+          }
+      }
+  }
+  return newArray;
+}
+
 function getAvailableRooms(rooms, remainingCustomerData) {
 // Filter rooms based on accommodation's room type and date range
 const availableRooms = rooms.filter((room) => {
@@ -82,7 +97,116 @@ function filterAvailableRooms(rooms, remainingCustomerData){
   return availableRooms;
 }
 
+function rangesConflicting(range1, range2){
+  return (
+      (range1.checkinDate <= range2.checkinDate && range1.checkoutDate>=range2.checkoutDate)||
+      (range1.checkoutDate >= range2.checkinDate && range1.checkoutDate <=range2.checkoutDate)||
+      (range1.checkinDate >= range2.checkinDate && range1.checkinDate<=range2.checkoutDate)||
+      (range1.checkinDate>=range2.checkinDate && range1.checkoutDate<=range2.checkoutDate)
+  )
+}
+
+function getNewRoomRanges(dateRange, booking){
+  let ranges = [];
+  let prevRoomRange = JSON.parse(JSON.stringify(dateRange["rooms"]));
+  let prevBedRange = JSON.parse(JSON.stringify(dateRange["beds"]));
+  if(dateRange["checkinDate"] < booking["checkinDate"]){
+      let prevDay = new Date(booking["checkinDate"].getTime() - 24*60*60*1000);
+      ranges.push(
+          {
+              "checkinDate": dateRange["checkinDate"],
+              "checkoutDate": prevDay,
+              "rooms": JSON.parse(JSON.stringify(prevRoomRange)),
+              "beds": JSON.parse(JSON.stringify(prevBedRange))
+          }
+      )
+  }
+  
+  let midRange = {
+    "checkinDate": (booking["checkinDate"]<=dateRange["checkinDate"])?dateRange["checkinDate"]:booking["checkinDate"],
+    "checkoutDate": (booking["checkoutDate"]>=dateRange["checkoutDate"])?dateRange["checkoutDate"]:booking["checkoutDate"],
+    "rooms": prevRoomRange,
+    "beds": prevBedRange
+  }
+  midRange.rooms[booking.roomType]+=1
+  midRange.beds[booking.roomType]+=booking.totalBeds
+  midRange.rooms["Total"]+=1
+  midRange.beds["Total"]+=booking.totalBeds
+  ranges.push(midRange)
+
+  if(dateRange["checkoutDate"]>booking["checkoutDate"]){
+      let nextDay = new Date(booking["checkoutDate"].getTime() + 24*60*60*1000);
+      ranges.push(
+          {
+              "checkinDate": nextDay,
+              "checkoutDate": dateRange["checkoutDate"],
+              "rooms": JSON.parse(JSON.stringify(prevRoomRange)),
+              "beds": JSON.parse(JSON.stringify(prevBedRange))
+          }
+      )
+  }
+
+  return ranges;
+}
+
+function getInventoryRanges(dateRanges, rooms){
+  dateRanges = JSON.parse(JSON.stringify(dateRanges));
+  dateRanges[0].checkinDate = new Date(dateRanges[0].checkinDate);
+  dateRanges[0].checkoutDate = new Date(dateRanges[0].checkoutDate);
+  for(let i = 0; i<rooms.length; i++){
+      let room = rooms[i];
+      for(let j = 0; j<dateRanges.length; j++){
+          if(rangesConflicting(dateRanges[j], room)){
+              console.log('here');
+              let newRanges = getNewRoomRanges(dateRanges[j], room);
+              let prevLength = dateRanges.length;
+              dateRanges = replaceElements(dateRanges, j, newRanges);
+              diffLength = dateRanges.length - prevLength;
+              j=j+(diffLength);
+          }
+      }
+  }
+  return dateRanges;
+}
+
 const hotelServices = {
+    getSingleHotelOverview(hotel, startDate, endDate){
+      let dateRanges = [{
+          "checkinDate": startDate,
+          "checkoutDate": endDate,
+          "rooms":{
+            "Quint": 0,
+            "Quad": 0,
+            "Triple": 0,
+            "Double": 0,
+            "Total": 0
+          },
+          "beds": {
+            "Quint": 0,
+            "Quad": 0,
+            "Triple": 0,
+            "Double": 0,
+            "Total": 0
+          }
+      }];
+      
+      //Filter the Rooms with given date range
+      let availableRooms = hotel.rooms.filter((room)=>{
+        return rangesConflicting(room, dateRanges[0])
+      });
+      console.log(availableRooms);
+      //Adding it in Hotel
+      inventory = getInventoryRanges(dateRanges, availableRooms);
+
+      return {
+        "hotelId": hotel._id,
+        "hotelName": hotel.name,
+        "hotelLocation": hotel.location,
+        "startDate": startDate,
+        "endDate": endDate,
+        "inventory": inventory
+      }
+    },
     async addHotelRooms(hotelId, roomDetails, checkin, checkout){
         const hotel = await Hotel.findOne({ _id: hotelId });
         let roomNumberCounter = hotel.rooms.length;

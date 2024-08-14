@@ -121,6 +121,41 @@ const hotelController = {
       });
     }
   },
+  async getSingleHotelOverview(req, res){
+    try{
+      const hotelId = req.params.id;
+      const startDate = new Date(req.query.startDate);
+      const endDate = new Date(req.query.endDate);
+
+      let hotel =  await Hotel.findById(hotelId);
+
+      if (!hotel) {
+        return res.status(404).send({
+          success: false,
+          data: { error: "Hotel not found" },
+        });
+      }
+
+      let overview = hotelServices.getSingleHotelOverview(hotel.toObject(), startDate, endDate)
+
+      return res.status(200).send({
+        success: true,
+        data: {
+          message: "Hotel details found",
+          overview
+        },
+      });
+
+    }
+    catch (error) {
+      console.error(error);
+      return res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  }
+  ,
   async getHotelDetails(req, res){
     try {
       const hotelId = req.params.id;
