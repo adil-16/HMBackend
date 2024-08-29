@@ -39,6 +39,11 @@ function getAvailableBeds(hotelObj, accommodation){
           (accommodation.checkout > customer.checkinDate && accommodation.checkout <= customer.checkoutDate) ||
           (accommodation.checkin <= customer.checkinDate && accommodation.checkout >= customer.checkoutDate))
           {
+              if(customer.bookingSubType != accommodation.bookingSubType){ //Here we are checking if the type of rooms are equal or not//
+                availableBeds=0;
+                break;
+              }
+              
               availableBeds-=customer.noOfBeds;
           }
       }
@@ -125,7 +130,7 @@ const voucherController = {
           .status(404)
           .send({ success: false, data: { error: "Customer not found" } });
       }
-
+      
       // Validate accommodations and their hotels
       let totalAmount = 0;
       // Create voucher
@@ -196,11 +201,10 @@ const voucherController = {
 
         let availableRooms = []
         //Also Checking if room is booked or not for that date.
-        if(accommodation.bookingType == "bed"){
+        if(accommodation.bookingType == "sharing" && accommodation.bookingSubType != "family"){
           availableRooms =  getAvailableBeds(hotelRecord, accommodation)
         }
         else{
-          
           availableRooms = getAvailableRooms(hotelRecord, accommodation)
         }
 
@@ -231,6 +235,7 @@ const voucherController = {
               checkoutDate: accommodation.checkout,
               bedRate: accommodation.bedRate,
               bookingType: accommodation.bookingType,
+              bookingSubType: accommodation.bookingSubType,
               noOfBeds: bedsToBeBooked
           })
           roomsAdded.push(room);
@@ -251,6 +256,7 @@ const voucherController = {
               checkinDate: accommodation.checkin,
               checkoutDate: accommodation.checkout,
               bookingType: accommodation.bookingType,
+              bookingSubType: accommodation.bookingSubType,
               noOfBeds: totalNumberOfBeds,
               roomType: accommodation.roomType
             }

@@ -23,4 +23,6 @@ hotelRouter.get("/wastageCollection", hotelController.getWastageCollection)
 hotelRouter.get("/inventoryInfo", hotelController.getInventoryInfo);
 hotelRouter.get("/getHotelDetails/:id", hotelController.getHotelDetails)
 hotelRouter.get("/getOverview/:id", hotelController.getSingleHotelOverview);
+hotelRouter.get("/getRanges/:id", hotelController.getHotelRanges);
+hotelRouter.get("/insights", hotelController.getInsights)
 module.exports =  hotelRouter;

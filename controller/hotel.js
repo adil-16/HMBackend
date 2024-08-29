@@ -81,6 +81,7 @@ const getBookedRoomsCount = (hotel) => {
 };
 
 const hotelController = {
+  
   async getInventoryInfo(req, res){
     try {
       let date = new Date (req.query.date);
@@ -862,6 +863,46 @@ const hotelController = {
       });
     }
   },
+
+  async getHotelRanges(req, res){
+    const hotelId = req.params.id;
+    const startDate = new Date(req.query.startDate);
+    const endDate = new Date(req.query.endDate);
+
+    try{
+      let hotelRanges = await hotelServices.getHotelInsight(hotelId, startDate, endDate);
+      return res.status(200).send({
+        success: true,
+        data: { hotelRanges },
+      });
+    }
+    catch(e){
+      console.log(e)
+      res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  },
+  async getInsights(req, res){
+    const startDate = new Date(req.query.startDate);
+    const endDate = new Date(req.query.endDate);
+
+    try{
+      let hotelsInsight = await hotelServices.getHotelsInsight(startDate, endDate)
+      return res.status(200).send({
+        success: true,
+        data: { hotelsInsight },
+      });
+    }
+    catch(e){
+      console.log(e)
+      res.status(500).send({
+        success: false,
+        data: { error: "Server Error" },
+      });
+    }
+  }
 };
 
 module.exports = hotelController;

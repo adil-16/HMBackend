@@ -1,4 +1,5 @@
 const Hotel = require("../models/hotel");
+const { getHotelRanges } = require("../utils/ranges-helper");
 const roomServices = require("./room");
 
 function getAvailableBeds(rooms, remainingCustomerData){
@@ -90,7 +91,7 @@ return availableRooms
 }
 
 function filterAvailableRooms(rooms, remainingCustomerData){
-  let availableRooms = remainingCustomerData.bookingType == "bed"? 
+  let availableRooms = remainingCustomerData.bookingType == "bed" && remainingCustomerData.bookingSubType != "family"? 
   getAvailableBeds(rooms, remainingCustomerData):
   getAvailableRooms(rooms, remainingCustomerData);
 
@@ -157,7 +158,6 @@ function getInventoryRanges(dateRanges, rooms){
       let room = rooms[i];
       for(let j = 0; j<dateRanges.length; j++){
           if(rangesConflicting(dateRanges[j], room)){
-              console.log('here');
               let newRanges = getNewRoomRanges(dateRanges[j], room);
               let prevLength = dateRanges.length;
               dateRanges = replaceElements(dateRanges, j, newRanges);
@@ -190,14 +190,19 @@ const hotelServices = {
           }
       }];
       
+
+      //1. Getting Inventory for given Range//
+
       //Filter the Rooms with given date range
       let availableRooms = hotel.rooms.filter((room)=>{
         return rangesConflicting(room, dateRanges[0])
       });
-      console.log(availableRooms);
       //Adding it in Hotel
-      inventory = getInventoryRanges(dateRanges, availableRooms);
+      let inventory = getInventoryRanges(dateRanges, availableRooms);
 
+      //2. Getting Successful Bookings for given Range//
+
+      //3. Getting Pending Bookings for given Range//
       return {
         "hotelId": hotel._id,
         "hotelName": hotel.name,
@@ -431,6 +436,68 @@ const hotelServices = {
         }
       }
       return plainHotel;
+    },
+    async getHotelsInsight(startDate, endDate){
+      
+      let hotels = await Hotel.find({});
+
+      let hotelsInsight = hotels.map((hotel)=>{
+        let range = {
+          checkinDate: startDate,
+          checkoutDate: endDate,
+          rooms: {
+            quint: 0,
+            quad: 0,
+            triple: 0,
+            double: 0,
+            total:0
+          },
+          beds: {
+            quint:0,
+            quad: 0,
+            triple: 0,
+            double: 0,
+            total:0
+          }
+        }
+
+        let insight = getHotelRanges(hotel, range)
+        return {
+          hotelId: hotel._id,
+          hotelName: hotel.name,
+          hotelLocation: hotel.location,
+          startDate,
+          endDate,
+          insight: insight
+        }
+      })
+
+      return hotelsInsight
+    },
+    async getHotelInsight(hotelId, startDate, endDate){
+      let range = {
+        checkinDate: startDate,
+        checkoutDate: endDate,
+        rooms: {
+          quint: 0,
+          quad: 0,
+          triple: 0,
+          double: 0,
+          total:0
+        },
+        beds: {
+          quint:0,
+          quad: 0,
+          triple: 0,
+          double: 0,
+          total:0
+        }
+      }
+      let hotel = await Hotel.findById(hotelId);
+      
+      let insight = getHotelRanges(hotel.toObject(), range);
+
+      return {checkinDate: startDate, checkoutDate: endDate, insight}
     }
 }
 

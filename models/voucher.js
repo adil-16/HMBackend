@@ -36,7 +36,11 @@ const accommodationSchema = new mongoose.Schema({
   },
   bookingType:{
     type: String,
-    enum: ['bed', 'room'] 
+    enum: ['sharing', 'nonSharing'] 
+  },
+  bookingSubType:{
+    type: String,
+    enum: ["male", "female", "family", "room"]
   },
   noOfBeds: {
     type: Number,

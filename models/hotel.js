@@ -27,6 +27,8 @@ const roomSchema = new Schema({
         voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
         checkinDate: Date,
         checkoutDate: Date,
+        bookingType: String,
+        bookingSubType: String,
         noOfBeds: Number,
         bedRate: Number
       }
@@ -57,6 +59,7 @@ const hotelSchema = new Schema({
       checkinDate: Date,
       checkoutDate: Date,
       bookingType: String,
+      bookingSubType: String,
       noOfBeds: Number,
       roomType: String
     }
