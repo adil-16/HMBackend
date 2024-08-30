@@ -27,8 +27,14 @@ const roomSchema = new Schema({
         voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
         checkinDate: Date,
         checkoutDate: Date,
-        bookingType: String,
-        bookingSubType: String,
+        bookingType:{
+          type: String,
+          enum: ['sharing', 'nonSharing'] 
+        },
+        bookingSubType:{
+          type: String,
+          enum: ["male", "female", "family"]
+        },
         noOfBeds: Number,
         bedRate: Number
       }
@@ -58,10 +64,18 @@ const hotelSchema = new Schema({
       voucherId: {type: mongoose.Schema.ObjectId, ref: "voucher"},
       checkinDate: Date,
       checkoutDate: Date,
-      bookingType: String,
-      bookingSubType: String,
+      bookingType:{
+        type: String,
+        enum: ['sharing', 'nonSharing'] 
+      },
+      bookingSubType:{
+        type: String,
+        enum: ["male", "female", "family"]
+      },
+      autoAdjust: Boolean,
       noOfBeds: Number,
-      roomType: String
+      roomType: String,
+      autoAdjust: Boolean
     }
   ]
 });

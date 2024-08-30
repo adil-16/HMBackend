@@ -39,7 +39,7 @@ function getAvailableBeds(hotelObj, accommodation){
           (accommodation.checkout > customer.checkinDate && accommodation.checkout <= customer.checkoutDate) ||
           (accommodation.checkin <= customer.checkinDate && accommodation.checkout >= customer.checkoutDate))
           {
-              if(customer.bookingSubType != accommodation.bookingSubType){ //Here we are checking if the type of rooms are equal or not//
+              if(accommodation.autoAdjust && customer.bookingSubType != accommodation.bookingSubType){ //Here we are checking if the type of rooms are equal or not//
                 availableBeds=0;
                 break;
               }
@@ -201,7 +201,7 @@ const voucherController = {
 
         let availableRooms = []
         //Also Checking if room is booked or not for that date.
-        if(accommodation.bookingType == "sharing" && accommodation.bookingSubType != "family"){
+        if(accommodation.bookingType == "sharing"){
           availableRooms =  getAvailableBeds(hotelRecord, accommodation)
         }
         else{
@@ -236,6 +236,7 @@ const voucherController = {
               bedRate: accommodation.bedRate,
               bookingType: accommodation.bookingType,
               bookingSubType: accommodation.bookingSubType,
+              autoAdjust: accommodation.autoAdjust,
               noOfBeds: bedsToBeBooked
           })
           roomsAdded.push(room);
@@ -257,6 +258,7 @@ const voucherController = {
               checkoutDate: accommodation.checkout,
               bookingType: accommodation.bookingType,
               bookingSubType: accommodation.bookingSubType,
+              autoAdjust: accommodation.autoAdjust,
               noOfBeds: totalNumberOfBeds,
               roomType: accommodation.roomType
             }

@@ -30,6 +30,12 @@ function getAvailableBeds(rooms, remainingCustomerData){
           (remainingCustomerData.checkoutDate > customer.checkinDate && remainingCustomerData.checkoutDate <= customer.checkoutDate) ||
           (remainingCustomerData.checkinDate <= customer.checkinDate && remainingCustomerData.checkoutDate >= customer.checkoutDate))
           {
+            
+              if(remainingCustomerData.autoAdjust && customer.bookingSubType != remainingCustomerData.bookingSubType){ //Here we are checking if the type of rooms are equal or not//
+                availableBeds=0;
+                break;
+              }
+              
               availableBeds-=customer.noOfBeds;
           }
       }
@@ -91,7 +97,7 @@ return availableRooms
 }
 
 function filterAvailableRooms(rooms, remainingCustomerData){
-  let availableRooms = remainingCustomerData.bookingType == "bed" && remainingCustomerData.bookingSubType != "family"? 
+  let availableRooms = remainingCustomerData.bookingType == "sharing"? 
   getAvailableBeds(rooms, remainingCustomerData):
   getAvailableRooms(rooms, remainingCustomerData);
 
@@ -261,6 +267,8 @@ const hotelServices = {
               checkoutDate: remainingCustomerData.checkoutDate,
               bedRate: remainingCustomerData.bedRate,
               bookingType: remainingCustomerData.bookingType,
+              bookingSubType: remainingCustomerData.bookingSubType,
+              autoAdjust: remainingCustomerData.autoAdjust,
               noOfBeds: bedsToBeBooked
             })
             remainingBeds-=bedsToBeBooked;

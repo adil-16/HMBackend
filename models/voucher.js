@@ -40,8 +40,9 @@ const accommodationSchema = new mongoose.Schema({
   },
   bookingSubType:{
     type: String,
-    enum: ["male", "female", "family", "room"]
+    enum: ["male", "female", "family"]
   },
+  autoAdjust: Boolean,
   noOfBeds: {
     type: Number,
     required: true,
